@@ -475,9 +475,8 @@ Built with ❤️ using:
 ## 📧 Contact
 
 For questions or feedback:
+- **Email:** harishsingla89@gmail.com
 - **Project Issues:** Create a GitHub issue
-- **Email:** [Your contact info here]
-- **Twitter:** [@YourHandle](https://twitter.com)
 
 ---
 
