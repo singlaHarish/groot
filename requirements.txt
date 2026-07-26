@@ -1,0 +1,9 @@
+streamlit
+pypdf
+tiktoken
+sentence-transformers
+faiss-cpu
+numpy
+google-generativeai
+google-genai
+plotly

@@ -1,0 +1,55 @@
+name: Deploy Groot AI to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: hack-team-quantum-avengers
+  REGION: europe-west1
+  SERVICE_NAME: groot-ai
+  INFRA_SA: infrastructure@hack-team-quantum-avengers.iam.gserviceaccount.com
+  WORKLOAD_SA: workload@hack-team-quantum-avengers.iam.gserviceaccount.com
+  WORKLOAD_IDENTITY_PROVIDER: projects/662541806905/locations/global/workloadIdentityPools/github-2026/providers/github-2026
+  IMAGE_NAME: europe-west3-docker.pkg.dev/hack-team-quantum-avengers/hack-team-quantum-avengers/groot-ai
+
+jobs:
+  deploy:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          export_environment_variables: true
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.INFRA_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker europe-west3-docker.pkg.dev
+
+      - name: Build and Push Container
+        run: |-
+          docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} groot-ai/
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Deploy Cloud Run
+        run: |
+          set -e
+          gcloud run deploy "${{ env.SERVICE_NAME }}" \
+            --region "${{ env.REGION }}" \
+            --image "${{ env.IMAGE_NAME }}:${{ github.sha }}" \
+            --service-account="${{ env.WORKLOAD_SA }}" \
+            --memory "2Gi" \
+            --allow-unauthenticated
