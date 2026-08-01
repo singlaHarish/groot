@@ -1,0 +1,40 @@
+name: Delete Groot AI Deployment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  delete:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Delete Cloud Run service
+        run: |
+          gcloud run services delete groot-ai \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed \
+            --quiet
+
+      - name: Delete Artifact Registry image
+        run: |
+          gcloud artifacts docker images delete \
+            europe-west3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/groot/groot-ai:latest \
+            --quiet \
+            --delete-tags
