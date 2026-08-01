@@ -34,7 +34,7 @@ jobs:
 
       - name: Delete Artifact Registry image
         run: |
-          gcloud artifacts docker images delete \
-            europe-west3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/groot/groot-ai:latest \
-            --quiet \
-            --delete-tags
+         gcloud artifacts repositories delete groot \
+          --location=europe-west3 \
+          --quiet
+
