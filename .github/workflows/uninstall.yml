@@ -25,12 +25,12 @@ jobs:
           version: 'latest'
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      # - name: Delete Cloud Run service
-      #   run: |
-      #     gcloud run services delete groot-ai \
-      #       --region ${{ secrets.GCP_REGION }} \
-      #       --platform managed \
-      #       --quiet
+      - name: Delete Cloud Run service
+        run: |
+          gcloud run services delete groot-ai \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed \
+            --quiet
 
       - name: Delete Artifact Registry image
         run: |
