@@ -21,35 +21,37 @@ def get_encoder():
     except Exception:
         return None
 
-def extract_text_from_pdf(pdf_file) -> str:
+def extract_text_from_pdf(pdf_file, progress_callback=None) -> str:
     """Extracts all text from a given uploaded PDF file."""
     reader = PdfReader(pdf_file)
     text = ""
-    for page in reader.pages:
+    total_pages = len(reader.pages)
+    for i, page in enumerate(reader.pages):
         page_text = page.extract_text()
         if page_text:
             text += page_text + "\n"
+        if progress_callback:
+            progress_callback(i + 1, total_pages)
     return text
 
 def chunk_text(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> list[str]:
     """
-    Splits text into chunks by roughly the specified number of words/tokens.
-    For simplicity, we do a basic character/word split.
+    Splits text into chunks using LangChain's RecursiveCharacterTextSplitter.
     """
-    # Simple split by paragraphs and sentences
-    words = text.split()
-    chunks = []
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     
-    i = 0
-    while i < len(words):
-        chunk_words = words[i:i + chunk_size]
-        chunks.append(" ".join(chunk_words))
-        i += chunk_size - chunk_overlap
-        
-        # Prevent infinite loop if overlap >= size
-        if chunk_size - chunk_overlap <= 0:
-            break
-            
+    # Approximate words to characters (avg 5 chars per word)
+    char_chunk_size = chunk_size * 5
+    char_chunk_overlap = chunk_overlap * 5
+    
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=char_chunk_size,
+        chunk_overlap=char_chunk_overlap,
+        length_function=len,
+        is_separator_regex=False,
+    )
+    
+    chunks = text_splitter.split_text(text)
     return chunks
 
 def count_tokens(text: str) -> int:
@@ -61,7 +63,7 @@ def count_tokens(text: str) -> int:
     return len(enc.encode(text))
 
 
-def build_faiss_index(chunks: list[str], api_key: str):
+def build_faiss_index(chunks: list[str], api_key: str, show_progress: bool = True):
     """
     Embeds the chunks using the local SentenceTransformer model and builds a FAISS index.
     Returns the index and the embeddings.
@@ -75,13 +77,15 @@ def build_faiss_index(chunks: list[str], api_key: str):
         st.error("Local embedding model failed to load. Please install sentence-transformers.")
         st.stop()
         
-    progress_bar = st.progress(0, text="Embedding chunks locally (this may take a moment)...")
+    if show_progress:
+        progress_bar = st.progress(0, text="Embedding chunks locally (this may take a moment)...")
     
     # SentenceTransformer encodes a list of strings into a numpy array
     embeddings = embedding_model.encode(chunks, show_progress_bar=False)
     
-    progress_bar.progress(1.0, text="Embedding complete!")
-    progress_bar.empty()
+    if show_progress:
+        progress_bar.progress(1.0, text="Embedding complete!")
+        progress_bar.empty()
     
     embeddings = np.array(embeddings, dtype=np.float32)
     dimension = embeddings.shape[1]
@@ -182,7 +186,7 @@ Query:
 {query}
 """
     try:
-        client = genai.Client(vertexai=True, project="singla", location="europe-west3")
+        client = genai.Client(vertexai=True, project="hack-team-quantum-avengers", location="global")
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -190,3 +194,85 @@ Query:
         return response.text
     except Exception as e:
         return f"Error communicating with Vertex AI: {str(e)}"
+
+import threading
+
+class DocumentProcessorThread(threading.Thread):
+    def __init__(self, uploaded_file_bytes, chunk_size, chunk_overlap, api_key):
+        super().__init__()
+        self.uploaded_file_bytes = uploaded_file_bytes
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.api_key = api_key
+        
+        self.result_index = None
+        self.result_embeddings = None
+        self.result_chunks = None
+        self.result_full_text = None
+        self.error = None
+        self.is_done = False
+        self.progress_msg = "Initializing..."
+        self.progress_pct = 0.0
+
+    def run(self):
+        try:
+            import io
+            import numpy as np
+            import faiss
+            
+            self.progress_msg = "Extracting text from PDF..."
+            self.progress_pct = 0.05
+            
+            pdf_io = io.BytesIO(self.uploaded_file_bytes)
+            
+            def pdf_callback(current, total):
+                self.progress_msg = f"Extracting text from PDF (Page {current}/{total})..."
+                self.progress_pct = 0.05 + (0.20 * current / max(1, total))
+                
+            full_text = extract_text_from_pdf(pdf_io, progress_callback=pdf_callback)
+            if not full_text.strip():
+                self.error = "Could not extract text from the PDF."
+                return
+                
+            self.progress_msg = "Splitting text into chunks..."
+            self.progress_pct = 0.25
+            chunks = chunk_text(full_text, chunk_size=int(self.chunk_size), chunk_overlap=int(self.chunk_overlap))
+            
+            self.progress_msg = "Loading embedding model..."
+            self.progress_pct = 0.30
+            embedding_model = get_embedding_model()
+            if embedding_model is None:
+                self.error = "Local embedding model failed to load."
+                return
+                
+            total_chunks = len(chunks)
+            batch_size = 32
+            all_embeddings = []
+            
+            for i in range(0, total_chunks, batch_size):
+                self.progress_msg = f"Embedding chunks: {i}/{total_chunks}..."
+                self.progress_pct = 0.30 + (0.65 * min(i, total_chunks) / max(1, total_chunks))
+                batch = chunks[i:i+batch_size]
+                emb = embedding_model.encode(batch, show_progress_bar=False)
+                all_embeddings.extend(emb)
+                
+            self.progress_msg = "Building vector index..."
+            self.progress_pct = 0.98
+            
+            embeddings_np = np.array(all_embeddings, dtype=np.float32)
+            dimension = embeddings_np.shape[1]
+            index = faiss.IndexFlatL2(dimension)
+            index.add(embeddings_np)
+            
+            self.progress_msg = "Complete!"
+            self.progress_pct = 1.0
+            
+            self.result_full_text = full_text
+            self.result_chunks = chunks
+            self.result_index = index
+            self.result_embeddings = embeddings_np
+        except Exception as e:
+            self.error = str(e)
+        finally:
+            self.is_done = True
+
