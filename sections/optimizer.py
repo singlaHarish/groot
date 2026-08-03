@@ -69,30 +69,60 @@ def render_optimizer():
                 </style>
             """, unsafe_allow_html=True)
 
-    # --- CORE OPTIMIZATION ENGINE (Runs via Button Click or Enter Press) ---
-    if uploaded_file and query.strip():
-        backend = config["backend"]
-        api_key = config["api_key"]
-        cost_per_1m = config["cost_per_1m"]
-        chunk_size = config["chunk_size"]
-        chunk_overlap = config["chunk_overlap"]
-        top_k = config["top_k"]
+    if "doc_thread" not in st.session_state:
+        st.session_state.doc_thread = None
+    if "doc_results" not in st.session_state:
+        st.session_state.doc_results = None
 
+    # --- CORE OPTIMIZATION ENGINE ---
+    backend = config["backend"]
+    api_key = config["api_key"]
+    cost_per_1m = config["cost_per_1m"]
+    chunk_size = config["chunk_size"]
+    chunk_overlap = config["chunk_overlap"]
+    top_k = config["top_k"]
+
+    if generate_btn and uploaded_file and query.strip():
         if backend == "API Key (Local)" and not api_key:
             st.error("Please click ⚙️ Settings in the top header and enter your Gemini API Key.")
             st.stop()
-
-        with st.spinner("Processing document & building vector index..."):
-            full_text = utils.extract_text_from_pdf(uploaded_file)
-            if not full_text.strip():
-                st.error("Could not extract text from the PDF.")
-                st.stop()
-                
-            chunks = utils.chunk_text(full_text, chunk_size=int(chunk_size), chunk_overlap=int(chunk_overlap))
-            index, embeddings = utils.build_faiss_index(chunks, api_key)
             
-            unoptimized_tokens = utils.count_tokens(full_text)
-            unoptimized_cost = (unoptimized_tokens / 1_000_000) * cost_per_1m
+        st.session_state.doc_results = None
+        
+        # Load models in main thread before starting background thread
+        utils.get_embedding_model()
+        utils.get_encoder()
+        
+        thread = utils.DocumentProcessorThread(uploaded_file.getvalue(), chunk_size, chunk_overlap, api_key)
+        thread.start()
+        st.session_state.doc_thread = thread
+
+    if st.session_state.doc_thread is not None:
+        thread = st.session_state.doc_thread
+        if not thread.is_done:
+            st.progress(thread.progress_pct, text=thread.progress_msg)
+            import time
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.session_state.doc_thread = None
+            if thread.error:
+                st.error(thread.error)
+            else:
+                st.session_state.doc_results = {
+                    "full_text": thread.result_full_text,
+                    "chunks": thread.result_chunks,
+                    "index": thread.result_index,
+                    "embeddings": thread.result_embeddings
+                }
+
+    if st.session_state.doc_results and query.strip():
+        full_text = st.session_state.doc_results["full_text"]
+        chunks = st.session_state.doc_results["chunks"]
+        index = st.session_state.doc_results["index"]
+        
+        unoptimized_tokens = utils.count_tokens(full_text)
+        unoptimized_cost = (unoptimized_tokens / 1_000_000) * cost_per_1m
 
         with st.spinner("Executing vector search retrieval..."):
             retrieved_chunks = utils.search_chunks(query, index, chunks, api_key, top_k=int(top_k))

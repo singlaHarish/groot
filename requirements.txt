@@ -7,3 +7,4 @@ numpy
 google-generativeai
 google-genai
 plotly
+langchain-text-splitters
