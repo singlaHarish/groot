@@ -29,6 +29,13 @@ jobs:
           version: 'latest'
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Create Artifact Registry (groot)
+        run: |
+          gcloud artifacts repositories create groot \
+            --repository-format=docker \
+            --location=europe-west3 \
+            --quiet
+
       - name: Configure Docker for GCP
         run: |
           gcloud auth configure-docker europe-west3-docker.pkg.dev

@@ -186,7 +186,7 @@ Query:
 {query}
 """
     try:
-        client = genai.Client(vertexai=True, project="hack-team-quantum-avengers", location="global")
+        client = genai.Client(vertexai=True, project="singla", location="europe-west3")
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
