@@ -57,4 +57,28 @@ jobs:
             --memory "2Gi" \
             --service-account="${{ secrets.RUN_SA }}" \
             --allow-unauthenticated
+
+      - name: Get Cloud Run Service URL
+        id: cloud-run-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe groot-ai --region ${{ secrets.GCP_REGION }} --format='value(status.url)')
+          echo "service_url=${SERVICE_URL}" >> $GITHUB_OUTPUT
+
+      - name: Print Deployment Summary to GitHub
+        run: |
+          IMAGE_PATH="europe-west3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/groot/groot-ai:latest"
+          SERVICE_URL="${{ steps.cloud-run-url.outputs.service_url }}"
+          
+          echo "## 🚀 Groot Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifact Registry" >> $GITHUB_STEP_SUMMARY
+          echo "📦 **Image Path:** \`${IMAGE_PATH}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Cloud Run Service" >> $GITHUB_STEP_SUMMARY
+          echo "🌐 **Service URL:** [groot-ai](${SERVICE_URL})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ secrets.GCP_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project ID:** ${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Memory:** 2Gi" >> $GITHUB_STEP_SUMMARY
         
