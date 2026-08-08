@@ -34,7 +34,7 @@ jobs:
           gcloud artifacts repositories create groot \
             --repository-format=docker \
             --location=europe-west3 \
-            --quiet
+            --quiet || true
 
       - name: Configure Docker for GCP
         run: |
