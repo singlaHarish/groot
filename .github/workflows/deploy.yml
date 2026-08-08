@@ -54,7 +54,7 @@ jobs:
             --image europe-west3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/groot/groot-ai:latest \
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
-            --memory "2Gi" \
+            --memory "4Gi" \
             --service-account="${{ secrets.RUN_SA }}" \
             --allow-unauthenticated
 
