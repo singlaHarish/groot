@@ -10,9 +10,15 @@ import streamlit as st
 @st.cache_resource(show_spinner="Loading embedding model...")
 def get_embedding_model():
     try:
-        return SentenceTransformer('all-MiniLM-L6-v2')
+        # all-mpnet-base-v2 is significantly better at semantic similarity
+        # than all-MiniLM-L6-v2 for complex/multi-topic queries
+        return SentenceTransformer('all-mpnet-base-v2')
     except Exception:
-        return None
+        try:
+            # Fallback to MiniLM if mpnet unavailable
+            return SentenceTransformer('all-MiniLM-L6-v2')
+        except Exception:
+            return None
 
 @st.cache_resource(show_spinner="Loading tokenizer...")
 def get_encoder():
@@ -99,25 +105,88 @@ def build_faiss_index(chunks: list[str], api_key: str, show_progress: bool = Tru
 def search_chunks(query: str, index, chunks: list[str], api_key: str, top_k: int = 3) -> list[str]:
     """
     Embeds the query locally, searches the FAISS index, and returns the top_k chunks.
+    Uses query expansion to improve retrieval for complex/broad queries.
+    Filters out chunks with low similarity (distance too high) to avoid irrelevant context.
     """
     import numpy as np
     
     embedding_model = get_embedding_model()
     if embedding_model is None:
         return []
-        
-    query_vector = embedding_model.encode([query])
-    query_vector = np.array(query_vector, dtype=np.float32)
+
+    # --- Query Expansion ---
+    # For broad/complex queries, we generate sub-queries and merge their results.
+    # This significantly improves recall for multi-aspect queries like
+    # "summarize risk factors" or "what are the key recommendations".
+    sub_queries = _expand_query(query)
+    all_queries = [query] + sub_queries
+
+    seen_indices = set()
+    candidate_chunks = []  # list of (distance, chunk_text)
+
+    for q in all_queries:
+        query_vector = embedding_model.encode([q])
+        query_vector = np.array(query_vector, dtype=np.float32)
+
+        # Retrieve more candidates than top_k, then re-rank
+        fetch_k = min(top_k * 3, len(chunks))
+        distances, indices = index.search(query_vector, fetch_k)
+
+        for dist, idx in zip(distances[0], indices[0]):
+            if idx != -1 and idx < len(chunks) and idx not in seen_indices:
+                seen_indices.add(idx)
+                candidate_chunks.append((dist, chunks[idx]))
+
+    # Sort by distance (lower = more similar in L2) and take top_k
+    candidate_chunks.sort(key=lambda x: x[0])
+
+    # Apply similarity threshold — discard chunks that are too dissimilar.
+    # L2 distance threshold of 1.5 works well for all-mpnet-base-v2 (384-dim).
+    # For all-MiniLM-L6-v2 (384-dim), same threshold applies.
+    SIMILARITY_THRESHOLD = 1.5
+    filtered = [chunk for dist, chunk in candidate_chunks if dist <= SIMILARITY_THRESHOLD]
+
+    # If threshold filters everything out (very broad query), fall back to raw top_k
+    if not filtered:
+        filtered = [chunk for _, chunk in candidate_chunks[:top_k]]
+
+    return filtered[:top_k]
+
+
+def _expand_query(query: str) -> list[str]:
+    """
+    Generates sub-queries from the original query to improve retrieval recall.
+    Handles broad/instructional queries that don't map well to factual chunk text.
     
-    # search returns distances and indices
-    distances, indices = index.search(query_vector, top_k)
-    
-    results = []
-    for idx in indices[0]:
-        if idx != -1 and idx < len(chunks):
-            results.append(chunks[idx])
-            
-    return results
+    e.g. "Summarize the main risk factors" →
+         ["risk factors", "risks", "main risks in the document"]
+    """
+    query_lower = query.lower().strip()
+
+    # Strip common instructional prefixes to get the core topic
+    instruction_prefixes = [
+        "summarize", "summarise", "explain", "describe", "list",
+        "what are", "what is", "tell me about", "give me", "provide",
+        "extract", "find", "identify", "outline"
+    ]
+
+    core_topic = query_lower
+    for prefix in instruction_prefixes:
+        if core_topic.startswith(prefix):
+            core_topic = core_topic[len(prefix):].strip().lstrip("the ").strip()
+            break
+
+    sub_queries = []
+
+    # Add the core topic as a sub-query if it differs from the original
+    if core_topic and core_topic != query_lower and len(core_topic) > 3:
+        sub_queries.append(core_topic)
+
+    # Add a noun-phrase variant
+    if len(core_topic.split()) > 1:
+        sub_queries.append(core_topic.split()[0])  # First keyword alone
+
+    return sub_queries
 
 def generate_gemini_response(api_key: str, context: str, query: str) -> str:
     """
@@ -131,10 +200,18 @@ def generate_gemini_response(api_key: str, context: str, query: str) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
     
     prompt = f"""
-You are an expert assistant. Please answer the user's query based ONLY on the provided context. 
-If the context does not contain the answer, say "I cannot answer this based on the provided document."
+You are an expert assistant helping users understand a document.
+Answer the user's query using the provided context excerpts from the document.
+The context is a set of the most relevant sections retrieved from the full document.
 
-Context:
+Guidelines:
+- Base your answer primarily on the provided context.
+- If the context contains partial information, use it to give the best possible answer.
+- If the context is insufficient to fully answer, provide what you can and clearly note what is missing.
+- Do NOT refuse to answer if the context contains any relevant information at all.
+- Keep your answer concise and focused on the query.
+
+Context (retrieved document sections):
 {context}
 
 Query:
@@ -176,10 +253,18 @@ def generate_gemini_vertex(context: str, query: str) -> str:
         return "Error: google-genai library is not installed."
         
     prompt = f"""
-You are an expert assistant. Please answer the user's query based ONLY on the provided context. 
-If the context does not contain the answer, say "I cannot answer this based on the provided document."
+You are an expert assistant helping users understand a document.
+Answer the user's query using the provided context excerpts from the document.
+The context is a set of the most relevant sections retrieved from the full document.
 
-Context:
+Guidelines:
+- Base your answer primarily on the provided context.
+- If the context contains partial information, use it to give the best possible answer.
+- If the context is insufficient to fully answer, provide what you can and clearly note what is missing.
+- Do NOT refuse to answer if the context contains any relevant information at all.
+- Keep your answer concise and focused on the query.
+
+Context (retrieved document sections):
 {context}
 
 Query:

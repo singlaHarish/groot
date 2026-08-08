@@ -44,9 +44,9 @@ def get_settings():
             "backend": "Vertex AI (Cloud Run)",
             "api_key": "VERTEX_AI_MODE",
             "cost_per_1m": 3.50,
-            "chunk_size": 300,
-            "chunk_overlap": 50,
-            "top_k": 5
+            "chunk_size": 500,   # increased from 300 — larger chunks preserve more context per chunk
+            "chunk_overlap": 100, # increased from 50 — more overlap reduces edge-case misses
+            "top_k": 8            # increased from 5 — retrieves more candidates for broad queries
         }
     return st.session_state.settings_config
 
