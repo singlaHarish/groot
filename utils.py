@@ -111,60 +111,104 @@ def search_chunks(query: str, index, chunks: list[str], api_key: str, top_k: int
     """
     Embeds the query locally, searches the FAISS index, and returns the top_k chunks.
     Uses query expansion to improve retrieval for complex/broad queries.
-    Filters out chunks with low similarity (distance too high) to avoid irrelevant context.
+    Applies keyword-boosted re-ranking so chunks containing terms from the query
+    rank higher, catching specific factual answers that vector similarity alone misses.
     """
     import numpy as np
-    
+
     embedding_model = get_embedding_model()
     if embedding_model is None:
         return []
 
     # --- Query Expansion ---
-    # For broad/complex queries, we generate sub-queries and merge their results.
-    # This significantly improves recall for multi-aspect queries like
-    # "summarize risk factors" or "what are the key recommendations".
+    # Generates multiple sub-queries so that paraphrased or conditional phrasing
+    # (e.g. "when source file is open") still maps onto the correct chunks.
     sub_queries = _expand_query(query)
     all_queries = [query] + sub_queries
 
     seen_indices = set()
-    candidate_chunks = []  # list of (distance, chunk_text)
+    candidate_chunks = []  # list of (distance, idx, chunk_text)
 
     for q in all_queries:
         query_vector = embedding_model.encode([q])
         query_vector = np.array(query_vector, dtype=np.float32)
 
-        # Retrieve more candidates than top_k, then re-rank
-        fetch_k = min(top_k * 3, len(chunks))
+        # Fetch a generous pool — 5× top_k — to leave room for re-ranking
+        fetch_k = min(top_k * 5, len(chunks))
         distances, indices = index.search(query_vector, fetch_k)
 
         for dist, idx in zip(distances[0], indices[0]):
             if idx != -1 and idx < len(chunks) and idx not in seen_indices:
                 seen_indices.add(idx)
-                candidate_chunks.append((dist, chunks[idx]))
+                candidate_chunks.append((dist, idx, chunks[idx]))
 
-    # Sort by distance (lower = more similar in L2) and take top_k
-    candidate_chunks.sort(key=lambda x: x[0])
+    # --- Keyword-Boosted Re-ranking ---
+    # Vector similarity captures semantic closeness but can miss specific
+    # operational details buried in a chunk (e.g. "protected exclusion mode").
+    # We subtract a bonus from the L2 distance for each query keyword that
+    # appears in the chunk, so these chunks float to the top.
+    query_keywords = _extract_keywords(query)
+    KEYWORD_BONUS = 0.08  # distance reduction per matched keyword
 
-    # Apply similarity threshold — discard chunks that are too dissimilar.
-    # L2 distance threshold of 1.5 works well for all-mpnet-base-v2 (384-dim).
-    # For all-MiniLM-L6-v2 (384-dim), same threshold applies.
-    SIMILARITY_THRESHOLD = 1.5
-    filtered = [chunk for dist, chunk in candidate_chunks if dist <= SIMILARITY_THRESHOLD]
+    def adjusted_distance(dist, chunk_text):
+        chunk_lower = chunk_text.lower()
+        matched = sum(1 for kw in query_keywords if kw in chunk_lower)
+        return dist - (matched * KEYWORD_BONUS)
 
-    # If threshold filters everything out (very broad query), fall back to raw top_k
+    candidate_chunks.sort(key=lambda x: adjusted_distance(x[0], x[2]))
+
+    # Apply a relaxed similarity threshold — generous enough to keep relevant
+    # conditional/factual chunks that score slightly worse on pure vector distance.
+    SIMILARITY_THRESHOLD = 2.0
+    filtered = [chunk for dist, idx, chunk in candidate_chunks if dist <= SIMILARITY_THRESHOLD]
+
+    # If threshold still filters everything out, fall back to raw top_k
     if not filtered:
-        filtered = [chunk for _, chunk in candidate_chunks[:top_k]]
+        filtered = [chunk for _, _, chunk in candidate_chunks[:top_k]]
 
     return filtered[:top_k]
+
+
+def _extract_keywords(query: str) -> list[str]:
+    """
+    Extracts meaningful keywords from a query for use in re-ranking.
+    Strips common stop words and instruction verbs, keeping domain terms.
+    """
+    stop_words = {
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "shall", "can", "need", "dare", "ought",
+        "used", "to", "of", "in", "on", "at", "by", "for", "with", "about",
+        "against", "between", "through", "during", "before", "after", "above",
+        "below", "from", "up", "down", "out", "off", "over", "under", "again",
+        "then", "once", "and", "but", "or", "nor", "so", "yet", "both",
+        "either", "neither", "not", "if", "when", "while", "how", "what",
+        "which", "who", "whom", "whose", "that", "this", "these", "those",
+        "i", "me", "my", "we", "our", "you", "your", "he", "she", "it",
+        "his", "her", "its", "they", "their", "them",
+        # common instruction verbs that add no retrieval signal
+        "summarize", "summarise", "explain", "describe", "list", "give",
+        "tell", "provide", "find", "show", "get", "extract", "identify",
+    }
+    words = re.findall(r"[a-z0-9]+", query.lower())
+    return [w for w in words if w not in stop_words and len(w) > 2]
 
 
 def _expand_query(query: str) -> list[str]:
     """
     Generates sub-queries from the original query to improve retrieval recall.
-    Handles broad/instructional queries that don't map well to factual chunk text.
-    
-    e.g. "Summarize the main risk factors" →
-         ["risk factors", "risks", "main risks in the document"]
+
+    Strategy:
+    1. Strip leading instruction verbs to expose the core topic.
+    2. Preserve conditional/contextual clauses (e.g. "when X", "if X is open")
+       as standalone sub-queries — these often map directly onto factual chunks.
+    3. Add a keyword-only fallback sub-query for broad queries.
+
+    e.g. "fup copy command when source file is open" →
+         ["fup copy source file open",
+          "when source file is open",
+          "source file open",
+          "fup copy"]
     """
     query_lower = query.lower().strip()
 
@@ -172,7 +216,7 @@ def _expand_query(query: str) -> list[str]:
     instruction_prefixes = [
         "summarize", "summarise", "explain", "describe", "list",
         "what are", "what is", "tell me about", "give me", "provide",
-        "extract", "find", "identify", "outline"
+        "extract", "find", "identify", "outline",
     ]
 
     core_topic = query_lower
@@ -183,13 +227,31 @@ def _expand_query(query: str) -> list[str]:
 
     sub_queries = []
 
-    # Add the core topic as a sub-query if it differs from the original
+    # 1. Core topic without instruction prefix
     if core_topic and core_topic != query_lower and len(core_topic) > 3:
         sub_queries.append(core_topic)
 
-    # Add a noun-phrase variant
-    if len(core_topic.split()) > 1:
-        sub_queries.append(core_topic.split()[0])  # First keyword alone
+    # 2. Extract conditional/contextual clauses — "when X", "if X", "while X"
+    #    These are the high-value sub-queries for "how does X behave when Y" questions.
+    conditional_pattern = re.compile(
+        r'\b(when|if|while|during|after|before|unless|until)\b(.{3,60})',
+        re.IGNORECASE
+    )
+    for match in conditional_pattern.finditer(query_lower):
+        clause = match.group(0).strip()
+        if clause not in sub_queries:
+            sub_queries.append(clause)
+        # Also add just the noun phrase after the conditional keyword
+        noun_phrase = match.group(2).strip()
+        if noun_phrase and noun_phrase not in sub_queries:
+            sub_queries.append(noun_phrase)
+
+    # 3. Keyword-only fallback (first 3 significant words)
+    keywords = _extract_keywords(query)
+    if keywords:
+        keyword_query = " ".join(keywords[:3])
+        if keyword_query not in sub_queries and keyword_query != core_topic:
+            sub_queries.append(keyword_query)
 
     return sub_queries
 
