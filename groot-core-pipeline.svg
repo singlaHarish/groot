@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1958" height="458" viewBox="0 0 1958 458">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4A90D9"/>
+    </marker>
+  </defs>
+  <rect width="1958" height="458" fill="#ffffff"/>
+  <text x="979" y="34" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="bold" fill="#1a1a2a">Groot — Document Processing Pipeline</text>
+  <text x="979" y="60" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#5a6a7a">How Groot reduces LLM context from a full document to a precise, query-relevant excerpt</text>
+  <rect x="32" y="90" width="1894" height="274" rx="6" ry="6" fill="#f0f4f8" stroke="#36393d" stroke-width="1"/>
+  <rect x="97" y="98" width="74" height="20" rx="10" ry="10" fill="#4A90D9"/>
+  <text x="134" y="112" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="bold" fill="#ffffff">INPUT</text>
+  <rect x="50" y="128" width="168" height="156" rx="6" ry="6" fill="#cce5ff" stroke="#36393d" stroke-width="1.5"/>
+  <text x="134" y="148" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="bold" fill="#000000">① PDF Upload</text>
+  <line x1="60" y1="156" x2="208" y2="156" stroke="#36393d" stroke-width="0.7" opacity="0.4"/>
+  <text x="134" y="174" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">User uploads PDF</text>
+  <text x="134" y="189" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">via browser</text>
+  <text x="134" y="209" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">pypdf.PdfReader</text>
+  <text x="134" y="224" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">extracts raw text</text>
+  <text x="134" y="239" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">page by page</text>
+  <line x1="222" y1="206" x2="262" y2="206" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="134" y="369" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">bytes → str</text>
+  <text x="134" y="382" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">full_text</text>
+  <rect x="315" y="98" width="74" height="20" rx="10" ry="10" fill="#4A90D9"/>
+  <text x="352" y="112" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="bold" fill="#ffffff">SPLIT</text>
+  <rect x="268" y="128" width="168" height="156" rx="6" ry="6" fill="#cce5ff" stroke="#36393d" stroke-width="1.5"/>
+  <text x="352" y="148" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="bold" fill="#000000">② Chunking</text>
+  <line x1="278" y1="156" x2="426" y2="156" stroke="#36393d" stroke-width="0.7" opacity="0.4"/>
+  <text x="352" y="174" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">LangChain Recursive</text>
+  <text x="352" y="189" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">CharacterTextSplitter</text>
+  <text x="352" y="209" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">500 words / chunk</text>
+  <text x="352" y="224" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">100 word overlap</text>
+  <line x1="440" y1="206" x2="480" y2="206" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="352" y="369" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">str → list[str]</text>
+  <text x="352" y="382" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">N chunks</text>
+  <rect x="533" y="98" width="74" height="20" rx="10" ry="10" fill="#4A90D9"/>
+  <text x="570" y="112" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="bold" fill="#ffffff">ENCODE</text>
+  <rect x="486" y="128" width="168" height="156" rx="6" ry="6" fill="#cce5ff" stroke="#36393d" stroke-width="1.5"/>
+  <text x="570" y="148" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="bold" fill="#000000">③ Embedding</text>
+  <line x1="496" y1="156" x2="644" y2="156" stroke="#36393d" stroke-width="0.7" opacity="0.4"/>
+  <text x="570" y="174" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">all-MiniLM-L6-v2</text>
+  <text x="570" y="189" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">SentenceTransformer</text>
+  <text x="570" y="209" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">Each chunk →</text>
+  <text x="570" y="224" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">384-dim float32</text>
+  <text x="570" y="239" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">vector</text>
+  <line x1="658" y1="206" x2="698" y2="206" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="570" y="369" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">list[str] →</text>
+  <text x="570" y="382" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">ndarray [N×384]</text>
+  <rect x="751" y="98" width="74" height="20" rx="10" ry="10" fill="#4A90D9"/>
+  <text x="788" y="112" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="bold" fill="#ffffff">INDEX</text>
+  <rect x="704" y="128" width="168" height="156" rx="6" ry="6" fill="#cce5ff" stroke="#36393d" stroke-width="1.5"/>
+  <text x="788" y="148" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="bold" fill="#000000">④ FAISS Index</text>
+  <line x1="714" y1="156" x2="862" y2="156" stroke="#36393d" stroke-width="0.7" opacity="0.4"/>
+  <text x="788" y="174" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">faiss.IndexFlatL2</text>
+  <text x="788" y="189" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">In-memory index</text>
+  <text x="788" y="209" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">Exact L2 search</text>
+  <text x="788" y="224" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">Sub-millisecond</text>
+  <text x="788" y="239" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">retrieval</text>
+  <line x1="876" y1="206" x2="916" y2="206" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="788" y="369" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">ndarray →</text>
+  <text x="788" y="382" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">FAISS index</text>
+  <rect x="922" y="124" width="768" height="218" rx="8" ry="8" fill="#e8f4e8" stroke="#2e7d32" stroke-width="2"/>
+  <text x="1306" y="142" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="bold" fill="#2e7d32">⑤  search_chunks( )  —  Query-Time Retrieval</text>
+  <rect x="1263" y="98" width="86" height="20" rx="10" ry="10" fill="#145A32"/>
+  <text x="1306" y="112" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="bold" fill="#ffffff">RETRIEVE</text>
+  <text x="1306" y="369" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">query + index</text>
+  <text x="1306" y="382" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">→ top-K chunks</text>
+  <line x1="876" y1="206" x2="916" y2="206" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="940" y="164" width="168" height="156" rx="5" ry="5" fill="#d4edda" stroke="#2e7d32" stroke-width="1.2"/>
+  <rect x="994" y="170" width="60" height="16" rx="8" ry="8" fill="#2e7d32"/>
+  <text x="1024" y="182" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" font-weight="bold" fill="#ffffff">EXPAND</text>
+  <text x="1024" y="200" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="bold" fill="#000000">① Query Expansion</text>
+  <line x1="948" y1="207" x2="1100" y2="207" stroke="#2e7d32" stroke-width="0.7" opacity="0.5"/>
+  <text x="1024" y="221" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Strip instruction prefix</text>
+  <text x="1024" y="234" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">e.g. 'summarize', 'explain'</text>
+  <text x="1024" y="251" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Extract when/if/while</text>
+  <text x="1024" y="264" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">clauses as sub-queries</text>
+  <text x="1024" y="281" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Add keyword fallback</text>
+  <text x="1024" y="294" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">→ 2–5 sub-queries total</text>
+  <line x1="1110" y1="242" x2="1124" y2="242" stroke="#2e7d32" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="1128" y="164" width="168" height="156" rx="5" ry="5" fill="#d4edda" stroke="#2e7d32" stroke-width="1.2"/>
+  <rect x="1182" y="170" width="60" height="16" rx="8" ry="8" fill="#2e7d32"/>
+  <text x="1212" y="182" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" font-weight="bold" fill="#ffffff">SEARCH</text>
+  <text x="1212" y="200" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="bold" fill="#000000">② FAISS Search</text>
+  <line x1="1136" y1="207" x2="1288" y2="207" stroke="#2e7d32" stroke-width="0.7" opacity="0.5"/>
+  <text x="1212" y="221" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Encode each sub-query</text>
+  <text x="1212" y="234" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">→ [1×384] vector</text>
+  <text x="1212" y="251" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">index.search(vec,</text>
+  <text x="1212" y="264" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">  k = top_k × 5)</text>
+  <text x="1212" y="281" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Merge + deduplicate</text>
+  <text x="1212" y="294" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">by chunk index</text>
+  <line x1="1298" y1="242" x2="1312" y2="242" stroke="#2e7d32" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="1316" y="164" width="168" height="156" rx="5" ry="5" fill="#d4edda" stroke="#2e7d32" stroke-width="1.2"/>
+  <rect x="1370" y="170" width="60" height="16" rx="8" ry="8" fill="#2e7d32"/>
+  <text x="1400" y="182" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" font-weight="bold" fill="#ffffff">RERANK</text>
+  <text x="1400" y="200" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="bold" fill="#000000">③ Keyword Re-rank</text>
+  <line x1="1324" y1="207" x2="1476" y2="207" stroke="#2e7d32" stroke-width="0.7" opacity="0.5"/>
+  <text x="1400" y="221" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Extract query keywords</text>
+  <text x="1400" y="234" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">(stop-word filtered)</text>
+  <text x="1400" y="251" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">adj_dist = dist −</text>
+  <text x="1400" y="264" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">  matched_kw × 0.08</text>
+  <text x="1400" y="281" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Sort by adj_dist</text>
+  <text x="1400" y="294" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">↑ exact-match chunks</text>
+  <line x1="1486" y1="242" x2="1500" y2="242" stroke="#2e7d32" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="1504" y="164" width="168" height="156" rx="5" ry="5" fill="#d4edda" stroke="#2e7d32" stroke-width="1.2"/>
+  <rect x="1558" y="170" width="60" height="16" rx="8" ry="8" fill="#2e7d32"/>
+  <text x="1588" y="182" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" font-weight="bold" fill="#ffffff">FILTER</text>
+  <text x="1588" y="200" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="bold" fill="#000000">④ Threshold Filter</text>
+  <line x1="1512" y1="207" x2="1664" y2="207" stroke="#2e7d32" stroke-width="0.7" opacity="0.5"/>
+  <text x="1588" y="221" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Keep L2 dist ≤ 2.0</text>
+  <text x="1588" y="234" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">(raw distance)</text>
+  <text x="1588" y="251" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Fallback: if empty</text>
+  <text x="1588" y="264" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">return raw top-K</text>
+  <text x="1588" y="281" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">Return top-K chunks</text>
+  <text x="1588" y="294" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#5a6a7a">to LLM context</text>
+  <line x1="1694" y1="206" x2="1734" y2="206" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="1787" y="98" width="74" height="20" rx="10" ry="10" fill="#4A235A"/>
+  <text x="1824" y="112" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="bold" fill="#ffffff">GENERATE</text>
+  <rect x="1740" y="128" width="168" height="156" rx="6" ry="6" fill="#cce5ff" stroke="#4A90D9" stroke-width="1.5"/>
+  <text x="1824" y="148" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="bold" fill="#000000">⑥ LLM Call</text>
+  <line x1="1750" y1="156" x2="1898" y2="156" stroke="#36393d" stroke-width="0.7" opacity="0.4"/>
+  <text x="1824" y="174" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">Top-K chunks sent</text>
+  <text x="1824" y="189" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">as context</text>
+  <text x="1824" y="209" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">Gemini 2.5 Flash</text>
+  <text x="1824" y="224" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">96% fewer tokens</text>
+  <text x="1824" y="239" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#5a6a7a">vs full document</text>
+  <text x="1824" y="369" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">chunks + query</text>
+  <text x="1824" y="382" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#5a6a7a">→ LLM response</text>
+  <line x1="50" y1="404" x2="872" y2="404" stroke="#4A90D9" stroke-width="1.5"/>
+  <text x="461" y="422" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="bold" fill="#4A90D9">Document Indexing  —  runs once per upload</text>
+  <line x1="922" y1="404" x2="1908" y2="404" stroke="#2e7d32" stroke-width="1.5"/>
+  <text x="1415" y="422" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="bold" fill="#2e7d32">Query-Time  —  runs on every query</text>
+</svg>
