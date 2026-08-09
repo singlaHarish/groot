@@ -10,9 +10,13 @@ import streamlit as st
 @st.cache_resource(show_spinner="Loading embedding model...")
 def get_embedding_model():
     try:
-        # all-mpnet-base-v2: ~420MB, 15-20% better semantic accuracy than MiniLM
+        import torch
+        # Use all available CPU cores for inference
+        torch.set_num_threads(max(1, torch.get_num_threads()))
+        # all-mpnet-base-v2: ~420MB, better semantic accuracy
         # Safe at 4Gi Cloud Run memory limit
-        return SentenceTransformer('all-mpnet-base-v2')
+        model = SentenceTransformer('all-mpnet-base-v2')
+        return model
     except Exception:
         try:
             return SentenceTransformer('all-MiniLM-L6-v2')
@@ -330,15 +334,21 @@ class DocumentProcessorThread(threading.Thread):
                 return
                 
             total_chunks = len(chunks)
-            batch_size = 32
-            all_embeddings = []
-            
-            for i in range(0, total_chunks, batch_size):
-                self.progress_msg = f"Embedding chunks: {i}/{total_chunks}..."
-                self.progress_pct = 0.30 + (0.65 * min(i, total_chunks) / max(1, total_chunks))
-                batch = chunks[i:i+batch_size]
-                emb = embedding_model.encode(batch, show_progress_bar=False)
-                all_embeddings.extend(emb)
+            self.progress_msg = f"Embedding {total_chunks} chunks..."
+            self.progress_pct = 0.40
+
+            # Encode all chunks in one call — SentenceTransformer handles
+            # internal batching more efficiently than a manual Python loop.
+            # batch_size=128 keeps memory reasonable while maximising CPU throughput.
+            all_embeddings = embedding_model.encode(
+                chunks,
+                batch_size=128,
+                show_progress_bar=False,
+                convert_to_numpy=True,
+                normalize_embeddings=False
+            )
+
+            self.progress_pct = 0.95
                 
             self.progress_msg = "Building vector index..."
             self.progress_pct = 0.98
