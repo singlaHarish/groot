@@ -11,17 +11,19 @@ import streamlit as st
 def get_embedding_model():
     try:
         import torch
-        # Use all available CPU cores for inference
+        import os
+        # Suppress Streamlit's file watcher from introspecting transformers internals
+        # which causes floods of harmless torchvision ModuleNotFoundError log noise
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
         torch.set_num_threads(max(1, torch.get_num_threads()))
-        # all-mpnet-base-v2: ~420MB, better semantic accuracy
-        # Safe at 4Gi Cloud Run memory limit
-        model = SentenceTransformer('all-mpnet-base-v2')
-        return model
+
+        # all-mpnet-base-v2 peaks at ~4.3GB during encode on Cloud Run CPU
+        # (PyTorch inference working memory + model weights + embeddings buffer)
+        # which exceeds the 4Gi limit. all-MiniLM-L6-v2 stays well under 2GB
+        # with comparable retrieval quality for this use case.
+        return SentenceTransformer('all-MiniLM-L6-v2')
     except Exception:
-        try:
-            return SentenceTransformer('all-MiniLM-L6-v2')
-        except Exception:
-            return None
+        return None
 
 @st.cache_resource(show_spinner="Loading tokenizer...")
 def get_encoder():
