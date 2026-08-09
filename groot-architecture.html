@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Groot — Enterprise Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0d120a;
+    color: #e2ece9;
+    min-height: 100vh;
+    padding: 40px 32px;
+  }
+  /* ── Header ── */
+  .page-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .page-header .badge {
+    display: inline-block;
+    background: rgba(156,204,101,.12);
+    border: 1px solid #9ccc65;
+    color: #aed581;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .page-header h1 {
+    font-size: 2.6rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #aed581 0%, #81c784 45%, #4fc3f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .page-header p {
+    color: #90a4ae;
+    font-size: 1rem;
+  }
+  /* ── Layout columns ── */
+  .arch-root {
+    display: grid;
+    grid-template-columns: 220px 1fr 220px;
+    grid-template-rows: auto auto auto;
+    gap: 0;
+    max-width: 1300px;
+    margin: 0 auto;
+    position: relative;
+  }
+  /* ── Swimlane labels ── */
+  .lane-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #546e7a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 6px;
+    border-right: 2px solid rgba(255,255,255,.06);
+  }
+  .lane-label.right {
+    border-right: none;
+    border-left: 2px solid rgba(255,255,255,.06);
+  }
+  /* ── Section titles ── */
+  .section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="badge">Enterprise Architecture</div>
+  <h1>🌿 Groot — AI Document Context Optimizer</h1>
+  <p>End-to-end system architecture &nbsp;·&nbsp; Google Cloud Platform &nbsp;·&nbsp; europe-west3</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     ROW 1 — CI/CD Pipeline (full width)
+     ════════════════════════════════════════════════════ -->
+<div style="max-width:1300px;margin:0 auto 0 auto;">
+
+<!-- CI/CD BAND -->
+<div style="
+  background: linear-gradient(90deg,rgba(33,150,243,.08) 0%,rgba(33,150,243,.04) 100%);
+  border:1px solid rgba(33,150,243,.25);
+  border-radius:16px;
+  padding:20px 28px;
+  margin-bottom:24px;
+">
+  <div style="font-size:.7rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+              color:#42a5f5;margin-bottom:14px;padding-bottom:8px;
+              border-bottom:1px solid rgba(33,150,243,.2);">
+    ⚙️ CI/CD Pipeline — GitHub Actions
+  </div>
+  <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;">
+
+    <!-- Developer -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+                border-radius:10px;padding:12px 18px;min-width:130px;text-align:center;">
+      <div style="font-size:1.6rem;">👨‍💻</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">Developer</div>
+      <div style="font-size:.65rem;color:#78909c;margin-top:2px;">git push</div>
+    </div>
+
+    <div style="color:#42a5f5;font-size:1.2rem;padding:0 8px;">→</div>
+
+    <!-- GitHub -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+                border-radius:10px;padding:12px 18px;min-width:130px;text-align:center;">
+      <div style="font-size:1.6rem;">🐙</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">GitHub</div>
+      <div style="font-size:.65rem;color:#78909c;margin-top:2px;">workflow_dispatch</div>
+    </div>
+
+    <div style="color:#42a5f5;font-size:1.2rem;padding:0 8px;">→</div>
+
+    <!-- GH Actions Runner -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+                border-radius:10px;padding:12px 18px;min-width:150px;text-align:center;">
+      <div style="font-size:1.6rem;">🏃</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">GH Actions Runner</div>
+      <div style="font-size:.65rem;color:#78909c;margin-top:2px;">ubuntu-latest</div>
+    </div>
+
+    <div style="color:#42a5f5;font-size:1.2rem;padding:0 8px;">→</div>
+
+    <!-- GCP Auth -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+                border-radius:10px;padding:12px 18px;min-width:140px;text-align:center;">
+      <div style="font-size:1.6rem;">🔐</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">GCP Auth</div>
+      <div style="font-size:.65rem;color:#78909c;margin-top:2px;">SA Key secret</div>
+    </div>
+
+    <div style="color:#42a5f5;font-size:1.2rem;padding:0 8px;">→</div>
+
+    <!-- Docker Build -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+                border-radius:10px;padding:12px 18px;min-width:140px;text-align:center;">
+      <div style="font-size:1.6rem;">🐳</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">Docker Build</div>
+      <div style="font-size:.65rem;color:#78909c;margin-top:2px;">python:3.11-slim</div>
+    </div>
+
+    <div style="color:#42a5f5;font-size:1.2rem;padding:0 8px;">→</div>
+
+    <!-- Artifact Registry -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+                border-radius:10px;padding:12px 18px;min-width:160px;text-align:center;">
+      <div style="font-size:1.6rem;">📦</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">Artifact Registry</div>
+      <div style="font-size:.65rem;color:#78909c;margin-top:2px;">europe-west3 / groot</div>
+    </div>
+
+    <div style="color:#42a5f5;font-size:1.2rem;padding:0 8px;">→</div>
+
+    <!-- Cloud Run Deploy -->
+    <div style="background:rgba(68,255,130,.06);border:1px solid rgba(68,255,130,.25);
+                border-radius:10px;padding:12px 18px;min-width:140px;text-align:center;">
+      <div style="font-size:1.6rem;">☁️</div>
+      <div style="font-size:.78rem;font-weight:700;color:#69f0ae;margin-top:4px;">Cloud Run Deploy</div>
+      <div style="font-size:.65rem;color:#78909c;margin-top:2px;">groot-ai · 4Gi</div>
+    </div>
+
+  </div>
+  <!-- Uninstall note -->
+  <div style="margin-top:10px;font-size:.65rem;color:#546e7a;">
+    ↩ <strong style="color:#ef9a9a;">uninstall.yml</strong> — workflow_dispatch teardown: deletes Cloud Run service + Artifact Registry
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     ROW 2 — Main 3-column architecture
+     ════════════════════════════════════════════════════ -->
+<div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:20px;margin-bottom:24px;">
+
+<!-- ── LEFT COLUMN: Client Layer ── -->
+<div style="display:flex;flex-direction:column;gap:16px;">
+
+  <div style="background:rgba(156,204,101,.05);border:1px solid rgba(156,204,101,.2);
+              border-radius:14px;padding:18px;">
+    <div style="font-size:.68rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+                color:#9ccc65;margin-bottom:12px;padding-bottom:6px;
+                border-bottom:1px solid rgba(156,204,101,.15);">🌐 Client Layer</div>
+
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                border-radius:10px;padding:12px;margin-bottom:10px;text-align:center;">
+      <div style="font-size:1.4rem;">🖥️</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">Desktop Browser</div>
+      <div style="font-size:.63rem;color:#78909c;margin-top:2px;">Responsive UI</div>
+    </div>
+
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                border-radius:10px;padding:12px;text-align:center;">
+      <div style="font-size:1.4rem;">📱</div>
+      <div style="font-size:.78rem;font-weight:700;color:#e2ece9;margin-top:4px;">Mobile Browser</div>
+      <div style="font-size:.63rem;color:#78909c;margin-top:2px;">Hamburger drawer nav</div>
+    </div>
+
+    <div style="margin-top:12px;padding:10px;background:rgba(156,204,101,.06);
+                border-radius:8px;font-size:.65rem;color:#90a4ae;line-height:1.5;">
+      <strong style="color:#aed581;">Routing:</strong> query param<br>
+      <code style="color:#80cbc4;">?nav=optimizer</code><br>
+      <code style="color:#80cbc4;">?nav=landing</code>
+    </div>
+  </div>
+
+  <!-- Enterprise Doc Sources -->
+  <div style="background:rgba(255,152,0,.05);border:1px solid rgba(255,152,0,.2);
+              border-radius:14px;padding:18px;">
+    <div style="font-size:.68rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+                color:#ffa726;margin-bottom:12px;padding-bottom:6px;
+                border-bottom:1px solid rgba(255,152,0,.15);">📂 Document Sources</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;text-align:center;font-size:.65rem;">
+        <div style="font-size:1.2rem;">📄</div>
+        <div style="color:#e2ece9;font-weight:700;margin-top:3px;">PDF Files</div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;text-align:center;font-size:.65rem;">
+        <div style="font-size:1.2rem;">📑</div>
+        <div style="color:#e2ece9;font-weight:700;margin-top:3px;">Reports</div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;text-align:center;font-size:.65rem;">
+        <div style="font-size:1.2rem;">📊</div>
+        <div style="color:#e2ece9;font-weight:700;margin-top:3px;">Manuals</div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;text-align:center;font-size:.65rem;">
+        <div style="font-size:1.2rem;">📋</div>
+        <div style="color:#e2ece9;font-weight:700;margin-top:3px;">Contracts</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:.63rem;color:#78909c;text-align:center;">
+      Uploaded via browser file picker
+    </div>
+  </div>
+
+</div>
+
+<!-- ── CENTRE COLUMN: Core Engine ── -->
+<div style="background:rgba(28,43,25,.6);border:1px solid rgba(156,204,101,.15);
+            border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:14px;">
+
+  <div style="font-size:.68rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+              color:#9ccc65;padding-bottom:8px;border-bottom:1px solid rgba(156,204,101,.15);">
+    ☁️ Google Cloud Run — groot-ai &nbsp;·&nbsp; europe-west3 &nbsp;·&nbsp; 4 GiB
+  </div>
+
+  <!-- Streamlit App -->
+  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);
+              border-radius:12px;padding:14px;">
+    <div style="font-size:.65rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                color:#4fc3f7;margin-bottom:10px;">Streamlit Application Layer</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
+      <div style="background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.2);
+                  border-radius:8px;padding:8px;text-align:center;font-size:.63rem;">
+        <div style="font-size:1.1rem;">🏠</div>
+        <div style="color:#b0bec5;margin-top:3px;font-weight:600;">app.py</div>
+        <div style="color:#546e7a;margin-top:1px;">router</div>
+      </div>
+      <div style="background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.2);
+                  border-radius:8px;padding:8px;text-align:center;font-size:.63rem;">
+        <div style="font-size:1.1rem;">🔝</div>
+        <div style="color:#b0bec5;margin-top:3px;font-weight:600;">header.py</div>
+        <div style="color:#546e7a;margin-top:1px;">nav + routing</div>
+      </div>
+      <div style="background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.2);
+                  border-radius:8px;padding:8px;text-align:center;font-size:.63rem;">
+        <div style="font-size:1.1rem;">⚙️</div>
+        <div style="color:#b0bec5;margin-top:3px;font-weight:600;">settings.py</div>
+        <div style="color:#546e7a;margin-top:1px;">config state</div>
+      </div>
+      <div style="background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.2);
+                  border-radius:8px;padding:8px;text-align:center;font-size:.63rem;">
+        <div style="font-size:1.1rem;">🔬</div>
+        <div style="color:#b0bec5;margin-top:3px;font-weight:600;">optimizer.py</div>
+        <div style="color:#546e7a;margin-top:1px;">main tool</div>
+      </div>
+    </div>
+    <div style="font-size:.62rem;color:#546e7a;text-align:center;">
+      Landing sections: hero · cost_savings · connectors · integration · environment · technology · footer_cta
+    </div>
+  </div>
+
+  <!-- Document Processing Pipeline -->
+  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);
+              border-radius:12px;padding:14px;">
+    <div style="font-size:.65rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                color:#aed581;margin-bottom:10px;">📄 Document Processing Pipeline</div>
+
+    <!-- Step 1 -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="background:linear-gradient(135deg,#2e7d32,#1b5e20);color:#e8f5e9;
+                  font-weight:800;width:24px;height:24px;border-radius:50%;
+                  display:flex;align-items:center;justify-content:center;
+                  flex-shrink:0;font-size:.7rem;">1</div>
+      <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+                  border-radius:8px;padding:8px 12px;">
+        <div style="font-size:.72rem;font-weight:700;color:#e2ece9;">PDF Text Extraction</div>
+        <div style="font-size:.62rem;color:#78909c;margin-top:2px;">pypdf · page-by-page with progress callback</div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="background:linear-gradient(135deg,#2e7d32,#1b5e20);color:#e8f5e9;
+                  font-weight:800;width:24px;height:24px;border-radius:50%;
+                  display:flex;align-items:center;justify-content:center;
+                  flex-shrink:0;font-size:.7rem;">2</div>
+      <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+                  border-radius:8px;padding:8px 12px;">
+        <div style="font-size:.72rem;font-weight:700;color:#e2ece9;">Semantic Chunking</div>
+        <div style="font-size:.62rem;color:#78909c;margin-top:2px;">LangChain RecursiveCharacterTextSplitter · chunk×5 chars · overlap×5 chars</div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="background:linear-gradient(135deg,#2e7d32,#1b5e20);color:#e8f5e9;
+                  font-weight:800;width:24px;height:24px;border-radius:50%;
+                  display:flex;align-items:center;justify-content:center;
+                  flex-shrink:0;font-size:.7rem;">3</div>
+      <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+                  border-radius:8px;padding:8px 12px;">
+        <div style="font-size:.72rem;font-weight:700;color:#e2ece9;">Vector Embedding</div>
+        <div style="font-size:.62rem;color:#78909c;margin-top:2px;">all-MiniLM-L6-v2 · 384-dim · batch_size=128 · &lt;2GB RAM · cached via @st.cache_resource</div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="background:linear-gradient(135deg,#2e7d32,#1b5e20);color:#e8f5e9;
+                  font-weight:800;width:24px;height:24px;border-radius:50%;
+                  display:flex;align-items:center;justify-content:center;
+                  flex-shrink:0;font-size:.7rem;">4</div>
+      <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+                  border-radius:8px;padding:8px 12px;">
+        <div style="font-size:.72rem;font-weight:700;color:#e2ece9;">FAISS Index Build</div>
+        <div style="font-size:.62rem;color:#78909c;margin-top:2px;">IndexFlatL2 · in-memory · sub-millisecond search · DocumentProcessorThread (non-blocking)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multi-Stage Retrieval Pipeline -->
+  <div style="background:rgba(156,204,101,.06);border:1px solid rgba(156,204,101,.2);
+              border-radius:12px;padding:14px;">
+    <div style="font-size:.65rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                color:#aed581;margin-bottom:10px;">🔍 Multi-Stage Retrieval Pipeline (utils.py)</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.62rem;font-weight:700;color:#4fc3f7;margin-bottom:5px;">① Query Expansion</div>
+        <div style="font-size:.6rem;color:#90a4ae;line-height:1.55;">
+          Strip instruction prefix<br>
+          Extract <em>when/if/while</em> clauses<br>
+          Keyword fallback<br>
+          <span style="color:#80cbc4;">→ N sub-queries</span>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.62rem;font-weight:700;color:#4fc3f7;margin-bottom:5px;">② FAISS Search</div>
+        <div style="font-size:.6rem;color:#90a4ae;line-height:1.55;">
+          Encode each sub-query<br>
+          Fetch 5× top_k per query<br>
+          Deduplicate by index<br>
+          <span style="color:#80cbc4;">→ candidate pool</span>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.62rem;font-weight:700;color:#4fc3f7;margin-bottom:5px;">③ Keyword Re-rank</div>
+        <div style="font-size:.6rem;color:#90a4ae;line-height:1.55;">
+          Extract stop-word filtered keywords<br>
+          −0.08 L2 dist per keyword hit<br>
+          Re-sort by adj. distance<br>
+          <span style="color:#80cbc4;">→ re-ranked pool</span>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.62rem;font-weight:700;color:#4fc3f7;margin-bottom:5px;">④ Threshold Filter</div>
+        <div style="font-size:.6rem;color:#90a4ae;line-height:1.55;">
+          L2 ≤ 2.0 filter<br>
+          Fallback to raw top_k<br>
+          Return top_k chunks<br>
+          <span style="color:#80cbc4;">→ optimized context</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Token Analysis + LLM -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);
+                border-radius:12px;padding:14px;">
+      <div style="font-size:.65rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                  color:#ffb74d;margin-bottom:8px;">📊 Token Analysis</div>
+      <div style="font-size:.63rem;color:#90a4ae;line-height:1.7;">
+        tiktoken <code style="color:#80cbc4;">cl100k_base</code><br>
+        Full doc tokens vs optimized tokens<br>
+        Cost calc at $/1M tokens<br>
+        Savings % &amp; $ delta<br>
+        <strong style="color:#aed581;">Typical: 60–96% reduction</strong>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);
+                border-radius:12px;padding:14px;">
+      <div style="font-size:.65rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                  color:#ce93d8;margin-bottom:8px;">🤖 Dual LLM Comparison</div>
+      <div style="font-size:.63rem;color:#90a4ae;line-height:1.7;">
+        <strong style="color:#ef9a9a;">Left:</strong> full raw document context<br>
+        <strong style="color:#a5d6a7;">Right:</strong> Groot optimized context<br>
+        Side-by-side quality check<br>
+        Exponential backoff retry (4×)
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /centre column -->
+
+<!-- ── RIGHT COLUMN: GCP Services & LLM Backends ── -->
+<div style="display:flex;flex-direction:column;gap:16px;">
+
+  <!-- GCP Platform -->
+  <div style="background:rgba(66,165,245,.05);border:1px solid rgba(66,165,245,.2);
+              border-radius:14px;padding:18px;">
+    <div style="font-size:.68rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+                color:#42a5f5;margin-bottom:12px;padding-bottom:6px;
+                border-bottom:1px solid rgba(66,165,245,.15);">☁️ GCP Platform</div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.7rem;font-weight:700;color:#90caf9;">Cloud Run</div>
+        <div style="font-size:.62rem;color:#78909c;margin-top:2px;">
+          groot-ai · managed · 4 GiB<br>
+          Allow unauthenticated<br>
+          Workload Identity SA
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.7rem;font-weight:700;color:#90caf9;">Artifact Registry</div>
+        <div style="font-size:.62rem;color:#78909c;margin-top:2px;">
+          europe-west3 / groot<br>
+          Docker format<br>
+          groot-ai:latest
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.7rem;font-weight:700;color:#90caf9;">IAM / Workload Identity</div>
+        <div style="font-size:.62rem;color:#78909c;margin-top:2px;">
+          Service account: RUN_SA<br>
+          No API key in prod<br>
+          GCP_SA_KEY (deploy only)
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- LLM Backends -->
+  <div style="background:rgba(206,147,216,.05);border:1px solid rgba(206,147,216,.2);
+              border-radius:14px;padding:18px;">
+    <div style="font-size:.68rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+                color:#ce93d8;margin-bottom:12px;padding-bottom:6px;
+                border-bottom:1px solid rgba(206,147,216,.15);">🤖 LLM Backends</div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+
+      <div style="background:rgba(206,147,216,.08);border:1px solid rgba(206,147,216,.2);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.68rem;font-weight:700;color:#ce93d8;">Vertex AI</div>
+        <div style="font-size:.63rem;color:#78909c;margin-top:3px;line-height:1.5;">
+          <span style="color:#a5d6a7;">✓ Production default</span><br>
+          gemini-2.5-flash<br>
+          google-genai SDK<br>
+          project: singla<br>
+          region: europe-west3
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                  border-radius:8px;padding:10px;">
+        <div style="font-size:.68rem;font-weight:700;color:#b0bec5;">Gemini REST API</div>
+        <div style="font-size:.63rem;color:#78909c;margin-top:3px;line-height:1.5;">
+          Local / dev mode<br>
+          gemini-3.5-flash<br>
+          API key via Settings<br>
+          4× retry + backoff
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Secrets -->
+  <div style="background:rgba(239,83,80,.05);border:1px solid rgba(239,83,80,.2);
+              border-radius:14px;padding:18px;">
+    <div style="font-size:.68rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+                color:#ef9a9a;margin-bottom:10px;padding-bottom:6px;
+                border-bottom:1px solid rgba(239,83,80,.15);">🔑 GitHub Secrets</div>
+    <div style="font-size:.63rem;color:#90a4ae;line-height:2;">
+      <code style="color:#ef9a9a;">GCP_SA_KEY</code><br>
+      <code style="color:#ef9a9a;">GCP_PROJECT_ID</code><br>
+      <code style="color:#ef9a9a;">GCP_REGION</code><br>
+      <code style="color:#ef9a9a;">RUN_SA</code>
+    </div>
+  </div>
+
+</div><!-- /right column -->
+
+</div><!-- /3-col grid -->
+
+<!-- ════════════════════════════════════════════════════
+     ROW 3 — Bottom metrics strip
+     ════════════════════════════════════════════════════ -->
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:40px;">
+
+  <div style="background:rgba(156,204,101,.08);border:1px solid rgba(156,204,101,.25);
+              border-radius:12px;padding:16px;text-align:center;">
+    <div style="font-size:1.6rem;">⚡</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#aed581;margin-top:6px;">&lt;1ms</div>
+    <div style="font-size:.65rem;color:#78909c;margin-top:3px;">Vector Search</div>
+  </div>
+
+  <div style="background:rgba(156,204,101,.08);border:1px solid rgba(156,204,101,.25);
+              border-radius:12px;padding:16px;text-align:center;">
+    <div style="font-size:1.6rem;">📉</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#aed581;margin-top:6px;">Up to 96%</div>
+    <div style="font-size:.65rem;color:#78909c;margin-top:3px;">Token Reduction</div>
+  </div>
+
+  <div style="background:rgba(156,204,101,.08);border:1px solid rgba(156,204,101,.25);
+              border-radius:12px;padding:16px;text-align:center;">
+    <div style="font-size:1.6rem;">🧠</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#aed581;margin-top:6px;">384-dim</div>
+    <div style="font-size:.65rem;color:#78909c;margin-top:3px;">Embedding Space</div>
+  </div>
+
+  <div style="background:rgba(156,204,101,.08);border:1px solid rgba(156,204,101,.25);
+              border-radius:12px;padding:16px;text-align:center;">
+    <div style="font-size:1.6rem;">💾</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#aed581;margin-top:6px;">&lt;2 GB</div>
+    <div style="font-size:.65rem;color:#78909c;margin-top:3px;">Model RAM</div>
+  </div>
+
+  <div style="background:rgba(156,204,101,.08);border:1px solid rgba(156,204,101,.25);
+              border-radius:12px;padding:16px;text-align:center;">
+    <div style="font-size:1.6rem;">🔍</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#aed581;margin-top:6px;">5× top_k</div>
+    <div style="font-size:.65rem;color:#78909c;margin-top:3px;">Candidate Pool</div>
+  </div>
+
+  <div style="background:rgba(156,204,101,.08);border:1px solid rgba(156,204,101,.25);
+              border-radius:12px;padding:16px;text-align:center;">
+    <div style="font-size:1.6rem;">🌱</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#aed581;margin-top:6px;">~96%</div>
+    <div style="font-size:.65rem;color:#78909c;margin-top:3px;">CO₂ Reduction/Query</div>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     LEGEND
+     ════════════════════════════════════════════════════ -->
+<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);
+            border-radius:12px;padding:16px 24px;max-width:1300px;margin:0 auto 32px auto;
+            display:flex;gap:28px;flex-wrap:wrap;align-items:center;">
+  <div style="font-size:.65rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#546e7a;">Legend</div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:.65rem;color:#90a4ae;">
+    <div style="width:12px;height:12px;border-radius:3px;background:rgba(156,204,101,.25);border:1px solid rgba(156,204,101,.5);"></div>
+    Application / Retrieval Layer
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:.65rem;color:#90a4ae;">
+    <div style="width:12px;height:12px;border-radius:3px;background:rgba(66,165,245,.25);border:1px solid rgba(66,165,245,.5);"></div>
+    GCP Infrastructure / CI-CD
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:.65rem;color:#90a4ae;">
+    <div style="width:12px;height:12px;border-radius:3px;background:rgba(206,147,216,.25);border:1px solid rgba(206,147,216,.5);"></div>
+    LLM Backend
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:.65rem;color:#90a4ae;">
+    <div style="width:12px;height:12px;border-radius:3px;background:rgba(255,152,0,.25);border:1px solid rgba(255,152,0,.5);"></div>
+    Document Sources
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:.65rem;color:#90a4ae;">
+    <div style="width:12px;height:12px;border-radius:3px;background:rgba(239,83,80,.25);border:1px solid rgba(239,83,80,.5);"></div>
+    Security / Secrets
+  </div>
+</div>
+
+<div style="text-align:center;font-size:.65rem;color:#37474f;padding-bottom:16px;">
+  Made with 🌿 &nbsp;·&nbsp; Groot AI Document Optimizer &nbsp;·&nbsp; GCP europe-west3
+</div>
+
+</div><!-- /max-width wrapper -->
+</body>
+</html>
