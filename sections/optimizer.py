@@ -225,30 +225,4 @@ def render_optimizer():
             </div>
         """, unsafe_allow_html=True)
 
-        # User Rating System
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("""
-            <div style="background: rgba(28, 22, 17, 0.4); padding: 1rem; border-radius: 12px; 
-                        border: 1px solid rgba(156, 204, 101, 0.15); text-align: center;">
-                <div style="font-size: 0.95rem; color: #b0bec5; margin-bottom: 0.8rem;">
-                    How does the optimized response quality compare to cost savings?
-                </div>
-        """, unsafe_allow_html=True)
-        
-        rate_col1, rate_col2, rate_col3 = st.columns(3)
-        with rate_col1:
-            if st.button("👍 Quality Worth It", key="rate_positive", use_container_width=True):
-                st.session_state["quality_rating"] = "positive"
-                st.success("Thanks! Your feedback helps us improve Groot.")
-        with rate_col2:
-            if st.button("⚖️ Mixed Results", key="rate_neutral", use_container_width=True):
-                st.session_state["quality_rating"] = "neutral"
-                st.info("Your feedback noted. We'll investigate this case.")
-        with rate_col3:
-            if st.button("👎 Quality Loss", key="rate_negative", use_container_width=True):
-                st.session_state["quality_rating"] = "negative"
-                st.warning("Thank you for the feedback. We'll review optimization strategy.")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown("</div>", unsafe_allow_html=True)
