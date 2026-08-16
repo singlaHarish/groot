@@ -5,10 +5,35 @@ import faiss
 import numpy as np
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
-import streamlit as st
 
-@st.cache_resource(show_spinner="Loading embedding model...")
+# Global cache for models (works in both Streamlit and non-Streamlit contexts)
+_embedding_model_cache = None
+_encoder_cache = None
+
+def _is_streamlit_context():
+    """Check if we're running inside Streamlit."""
+    try:
+        import streamlit as st
+        # Try to access session_state, which only exists in Streamlit context
+        _ = st.session_state
+        return True
+    except (ImportError, AttributeError, RuntimeError):
+        return False
+
+def _streamlit_cache(func):
+    """Decorator that applies Streamlit caching only if in Streamlit context."""
+    if _is_streamlit_context():
+        import streamlit as st
+        return st.cache_resource(show_spinner=f"Loading {func.__name__}...")(func)
+    return func
+
 def get_embedding_model():
+    """Load embedding model with caching that works in both Streamlit and non-Streamlit contexts."""
+    global _embedding_model_cache
+    
+    if _embedding_model_cache is not None:
+        return _embedding_model_cache
+    
     try:
         import torch
         import os
@@ -21,14 +46,21 @@ def get_embedding_model():
         # (PyTorch inference working memory + model weights + embeddings buffer)
         # which exceeds the 4Gi limit. all-MiniLM-L6-v2 stays well under 2GB
         # with comparable retrieval quality for this use case.
-        return SentenceTransformer('all-MiniLM-L6-v2')
-    except Exception:
+        _embedding_model_cache = SentenceTransformer('all-MiniLM-L6-v2')
+        return _embedding_model_cache
+    except Exception as e:
         return None
 
-@st.cache_resource(show_spinner="Loading tokenizer...")
 def get_encoder():
+    """Load tokenizer with caching that works in both Streamlit and non-Streamlit contexts."""
+    global _encoder_cache
+    
+    if _encoder_cache is not None:
+        return _encoder_cache
+    
     try:
-        return tiktoken.get_encoding("cl100k_base")
+        _encoder_cache = tiktoken.get_encoding("cl100k_base")
+        return _encoder_cache
     except Exception:
         return None
 
@@ -78,33 +110,48 @@ def build_faiss_index(chunks: list[str], api_key: str, show_progress: bool = Tru
     """
     Embeds the chunks using the local SentenceTransformer model and builds a FAISS index.
     Returns the index and the embeddings.
+
+    show_progress=True  — renders a Streamlit progress bar (Streamlit runtime required).
+    show_progress=False — silent mode, safe to call outside Streamlit (e.g. MCP server).
     """
     import numpy as np
     import faiss
-    import streamlit as st
-    
+
     embedding_model = get_embedding_model()
     if embedding_model is None:
-        st.error("Local embedding model failed to load. Please install sentence-transformers.")
-        st.stop()
-        
+        error_msg = "Local embedding model failed to load. Please install sentence-transformers."
+        if show_progress:
+            try:
+                import streamlit as st
+                st.error(error_msg)
+                st.stop()
+            except:
+                raise RuntimeError(error_msg)
+        else:
+            raise RuntimeError(error_msg)
+
+    progress_bar = None
     if show_progress:
-        progress_bar = st.progress(0, text="Embedding chunks locally (this may take a moment)...")
-    
+        try:
+            import streamlit as st
+            progress_bar = st.progress(0, text="Embedding chunks locally (this may take a moment)...")
+        except:
+            pass  # Streamlit not available, continue without progress bar
+
     # SentenceTransformer encodes a list of strings into a numpy array
     embeddings = embedding_model.encode(chunks, show_progress_bar=False)
-    
-    if show_progress:
+
+    if progress_bar:
         progress_bar.progress(1.0, text="Embedding complete!")
         progress_bar.empty()
-    
+
     embeddings = np.array(embeddings, dtype=np.float32)
     dimension = embeddings.shape[1]
-    
+
     # Create L2 distance index
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
-    
+
     return index, embeddings
 
 def search_chunks(query: str, index, chunks: list[str], api_key: str, top_k: int = 3) -> list[str]:
@@ -343,7 +390,7 @@ Query:
             model="gemini-2.5-flash",
             contents=prompt,
         )
-        return response.text
+        return response.text if response.text is not None else "No response generated from Vertex AI"
     except Exception as e:
         return f"Error communicating with Vertex AI: {str(e)}"
 
