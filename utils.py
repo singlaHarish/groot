@@ -302,6 +302,125 @@ def _expand_query(query: str) -> list[str]:
 
     return sub_queries
 
+
+def compute_response_quality(full_response: str, optimized_response: str) -> dict:
+    """
+    Computes semantic similarity between two LLM responses using sentence embeddings.
+    
+    Uses all-MiniLM-L6-v2 (already loaded) for semantic embeddings and cosine similarity
+    to measure how well the optimized response captures the full response.
+    
+    Args:
+        full_response: Response generated from full document context
+        optimized_response: Response generated from optimized (retrieved) chunks
+        
+    Returns:
+        {
+            "precision": float (0-1),     # How much of optimized is in full response context
+            "recall": float (0-1),        # How much of full response is captured in optimized
+            "f1": float (0-1),            # Harmonic mean — primary quality metric
+            "quality_label": str,         # "High Quality", "Good Quality", etc.
+            "description": str            # Human-readable explanation
+        }
+    """
+    try:
+        from sklearn.metrics.pairwise import cosine_similarity
+        
+        # Normalize responses for fair comparison
+        full_resp_clean = full_response.strip()
+        opt_resp_clean = optimized_response.strip()
+        
+        if not full_resp_clean or not opt_resp_clean:
+            return {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1": 0.0,
+                "quality_label": "Error",
+                "description": "One or both responses are empty"
+            }
+        
+        # Get embedding model
+        embedding_model = get_embedding_model()
+        if embedding_model is None:
+            raise RuntimeError("Could not load embedding model")
+        
+        # Generate embeddings for both responses
+        full_emb = embedding_model.encode(full_resp_clean, normalize_embeddings=True)
+        opt_emb = embedding_model.encode(opt_resp_clean, normalize_embeddings=True)
+        
+        # Compute cosine similarity
+        similarity = cosine_similarity([opt_emb], [full_emb])[0][0]
+        
+        # Also check by splitting into sentences and comparing coverage
+        full_sentences = [s.strip() for s in full_resp_clean.split('.') if s.strip()]
+        opt_sentences = [s.strip() for s in opt_resp_clean.split('.') if s.strip()]
+        
+        # Estimate coverage: what % of full response topics are covered in optimized
+        if full_sentences and opt_sentences:
+            # Embed sentences and check overlap
+            full_sent_embs = embedding_model.encode(full_sentences, normalize_embeddings=True)
+            opt_sent_embs = embedding_model.encode(opt_sentences, normalize_embeddings=True)
+            
+            # For each full sentence, find best match in optimized
+            matches = 0
+            for full_sent_emb in full_sent_embs:
+                best_match = cosine_similarity([full_sent_emb], opt_sent_embs).max()
+                if best_match > 0.6:  # Threshold for considering a sentence "covered"
+                    matches += 1
+            
+            recall = matches / len(full_sent_embs) if full_sent_embs.size > 0 else 0
+        else:
+            recall = similarity
+        
+        # Precision: how much of optimized response is relevant to full response
+        precision = similarity
+        
+        # F1 is harmonic mean
+        if precision + recall > 0:
+            f1 = 2 * (precision * recall) / (precision + recall)
+        else:
+            f1 = 0
+        
+        # Determine quality label based on F1 score
+        if f1 >= 0.75:
+            quality_label = "High Quality"
+            description = f"Excellent semantic alignment ({f1:.1%})"
+        elif f1 >= 0.60:
+            quality_label = "Good Quality"
+            description = f"Good semantic coverage ({f1:.1%})"
+        elif f1 >= 0.45:
+            quality_label = "Moderate Quality"
+            description = f"Moderate quality retention ({f1:.1%})"
+        else:
+            quality_label = "Low Quality"
+            description = f"Significant quality loss ({f1:.1%})"
+        
+        return {
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1": float(f1),
+            "quality_label": quality_label,
+            "description": description
+        }
+        
+    except ImportError as e:
+        return {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "quality_label": "Unavailable",
+            "description": f"Quality metrics unavailable: {str(e)}"
+        }
+    except Exception as e:
+        return {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "quality_label": "Error",
+            "description": f"Quality computation failed: {str(e)}"
+        }
+
+
 def generate_gemini_response(api_key: str, context: str, query: str) -> str:
     """
     Sends the context and query to Gemini using the REST API to bypass module issues.

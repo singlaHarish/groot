@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "groot": {
+      "type": "stdio",
+      "command": "C:\\Users\\Admin\\IdeaProjects\\groot\\.venv\\Scripts\\python.exe",
+      "args": ["mcp_server.py"],
+      "cwd": "C:\\Users\\Admin\\IdeaProjects\\groot",
+      "env": {
+        "PYTHONPATH": "C:\\Users\\Admin\\IdeaProjects\\groot"
+      }
+    }
+  }
+}

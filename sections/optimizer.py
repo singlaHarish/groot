@@ -188,4 +188,67 @@ def render_optimizer():
                     opt_response = utils.generate_gemini_vertex(optimized_text, query)
                 st.success(opt_response)
 
+        # --- QUALITY METRICS SECTION ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        with st.spinner("Computing response quality metrics..."):
+            quality = utils.compute_response_quality(full_response, opt_response)
+        
+        # Color code based on quality label
+        if "High" in quality["quality_label"]:
+            quality_color = "#81c784"  # Green
+            quality_emoji = "🟢"
+        elif "Good" in quality["quality_label"]:
+            quality_color = "#ffd54f"  # Yellow
+            quality_emoji = "🟡"
+        else:
+            quality_color = "#ef5350"  # Red
+            quality_emoji = "🔴"
+
+        st.markdown(f"""
+            <div style="background: rgba(28, 22, 17, 0.65); backdrop-filter: blur(12px); 
+                        padding: 1.5rem; border-radius: 16px; border: 1px solid rgba(156, 204, 101, 0.2); 
+                        text-align: center; margin-top: 1rem;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{quality_emoji}</div>
+                <div style="font-size: 1.3rem; font-weight: 800; color: {quality_color}; margin-bottom: 0.5rem;">
+                    {quality['quality_label']}
+                </div>
+                <div style="font-size: 1.05rem; color: #b0bec5; margin-bottom: 1rem;">
+                    F1 Score: <span style="color: {quality_color}; font-weight: 700;">{quality['f1']:.1%}</span>
+                </div>
+                <div style="font-size: 0.95rem; color: #90a4ae; line-height: 1.5;">
+                    {quality['description']}<br>
+                    <span style="font-size: 0.85rem; color: #78909c;">
+                    Semantic Precision: {quality['precision']:.1%} | Recall: {quality['recall']:.1%}
+                    </span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # User Rating System
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("""
+            <div style="background: rgba(28, 22, 17, 0.4); padding: 1rem; border-radius: 12px; 
+                        border: 1px solid rgba(156, 204, 101, 0.15); text-align: center;">
+                <div style="font-size: 0.95rem; color: #b0bec5; margin-bottom: 0.8rem;">
+                    How does the optimized response quality compare to cost savings?
+                </div>
+        """, unsafe_allow_html=True)
+        
+        rate_col1, rate_col2, rate_col3 = st.columns(3)
+        with rate_col1:
+            if st.button("👍 Quality Worth It", key="rate_positive", use_container_width=True):
+                st.session_state["quality_rating"] = "positive"
+                st.success("Thanks! Your feedback helps us improve Groot.")
+        with rate_col2:
+            if st.button("⚖️ Mixed Results", key="rate_neutral", use_container_width=True):
+                st.session_state["quality_rating"] = "neutral"
+                st.info("Your feedback noted. We'll investigate this case.")
+        with rate_col3:
+            if st.button("👎 Quality Loss", key="rate_negative", use_container_width=True):
+                st.session_state["quality_rating"] = "negative"
+                st.warning("Thank you for the feedback. We'll review optimization strategy.")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
         st.markdown("</div>", unsafe_allow_html=True)

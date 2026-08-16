@@ -121,6 +121,102 @@ TOOLS = [
             "properties": {},
             "required": []
         }
+    },
+    {
+        "name": "prepare_comparison_data",
+        "description": (
+            "Prepare data for quality comparison: extracts full document text and "
+            "retrieves optimized chunks for a query. Returns both texts ready for "
+            "you to generate responses. No API key needed — you generate responses "
+            "using your own LLM, then call compare_responses to measure quality."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pdf_path": {
+                    "type": "string",
+                    "description": "Absolute path to the PDF file on disk."
+                },
+                "query": {
+                    "type": "string",
+                    "description": "The question or topic to retrieve optimized chunks for."
+                },
+                "top_k": {
+                    "type": "integer",
+                    "description": "Number of retrieved chunks to return (default 8).",
+                    "default": 8
+                },
+                "chunk_size": {
+                    "type": "integer",
+                    "description": "Words per chunk (default 500).",
+                    "default": 500
+                },
+                "chunk_overlap": {
+                    "type": "integer",
+                    "description": "Overlap between chunks in words (default 100).",
+                    "default": 100
+                }
+            },
+            "required": ["pdf_path", "query"]
+        }
+    },
+    {
+        "name": "compare_responses",
+        "description": (
+            "Compare quality between two LLM responses using semantic similarity. "
+            "Measures F1 score, precision, and recall to show how well the optimized "
+            "response matches the full-document response. Lightweight — no API key needed."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "full_response": {
+                    "type": "string",
+                    "description": "Response generated from full document context."
+                },
+                "optimized_response": {
+                    "type": "string",
+                    "description": "Response generated from Groot-optimized chunks."
+                }
+            },
+            "required": ["full_response", "optimized_response"]
+        }
+    },
+    {
+        "name": "quality_analysis",
+        "description": (
+            "One-shot quality analysis: retrieves document data, measures efficiency, "
+            "and compares response quality. Provide PDF, query, and both responses. "
+            "Returns complete report with token reduction %, F1 score, precision, recall, "
+            "and quality assessment — everything in one call."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pdf_path": {
+                    "type": "string",
+                    "description": "Absolute path to the PDF file on disk."
+                },
+                "query": {
+                    "type": "string",
+                    "description": "The question or topic used for the comparison."
+                },
+                "full_response": {
+                    "type": "string",
+                    "description": "Response generated from full document context."
+                },
+                "optimized_response": {
+                    "type": "string",
+                    "description": "Response generated from Groot-optimized chunks."
+                },
+                "top_k": {
+                    "type": "integer",
+                    "description": "Number of chunks retrieved (default 8).",
+                    "default": 8
+                }
+            },
+            "required": ["pdf_path", "query", "full_response", "optimized_response"]
+        }
     }
 ]
 
@@ -239,6 +335,173 @@ def tool_list_indexed(_args: dict) -> str:
     return "\n".join(lines)
 
 
+def tool_prepare_comparison_data(args: dict) -> str:
+    """
+    Prepares data for quality comparison: returns full text + optimized chunks.
+    No API key needed. You generate responses yourself, then use compare_responses.
+    """
+    import utils
+
+    pdf_path     = args["pdf_path"]
+    query        = args["query"]
+    top_k        = int(args.get("top_k", 8))
+    chunk_size   = int(args.get("chunk_size", 500))
+    chunk_overlap = int(args.get("chunk_overlap", 100))
+
+    # Ensure document is indexed
+    entry = _ensure_indexed(pdf_path, chunk_size, chunk_overlap)
+    full_text = entry["full_text"]
+    chunks = entry["chunks"]
+    index = entry["index"]
+
+    # Retrieve optimized chunks
+    retrieved = utils.search_chunks(query, index, chunks, api_key=None, top_k=top_k)
+    optimized_text = "\n\n---\n\n".join(retrieved)
+
+    # Calculate token counts and savings
+    full_tokens = utils.count_tokens(full_text)
+    opt_tokens = utils.count_tokens(optimized_text)
+    savings_pct = round(100 * (1 - opt_tokens / full_tokens), 1) if full_tokens > 0 else 0
+
+    # Format output
+    output = f"""[Groot] Comparison Data Ready
+{'─' * 60}
+
+EFFICIENCY (before generating responses):
+  Token Reduction Potential: {savings_pct}%
+  Full Document Size: {full_tokens:,} tokens
+  Optimized Context Size: {opt_tokens:,} tokens
+  Chunks Retrieved: {len(retrieved)}
+
+{'─' * 60}
+FULL DOCUMENT TEXT:
+(Use this to generate response #1 with your LLM)
+
+{full_text}
+
+{'─' * 60}
+OPTIMIZED CHUNKS:
+(Use this to generate response #2 with your LLM)
+
+{optimized_text}
+
+{'─' * 60}
+NEXT STEPS:
+1. Generate response #1 by prompting your LLM with the FULL DOCUMENT TEXT above
+2. Generate response #2 by prompting your LLM with the OPTIMIZED CHUNKS above
+3. Use the compare_responses tool to measure quality (F1 score, precision, recall)
+"""
+
+    return output
+
+
+def tool_compare_responses(args: dict) -> str:
+    """
+    Compare quality between two responses using semantic similarity.
+    Returns F1 score, precision, recall, and quality label.
+    """
+    import utils
+
+    full_response = args["full_response"]
+    optimized_response = args["optimized_response"]
+
+    # Compute quality metrics
+    quality = utils.compute_response_quality(full_response, optimized_response)
+
+    # Format output
+    output = f"""[Groot] Response Quality Comparison
+{'─' * 60}
+
+QUALITY METRICS:
+  F1 Score (semantic match): {quality['f1']:.1%}
+  Precision (relevance): {quality['precision']:.1%}
+  Recall (coverage): {quality['recall']:.1%}
+  Quality Label: {quality['quality_label']}
+  Description: {quality['description']}
+
+{'─' * 60}
+QUALITY ASSESSMENT:
+{quality['description']}
+
+The optimized response captures {quality['recall']:.0%} of the key information 
+from the full response with {quality['precision']:.0%} relevance.
+F1 score of {quality['f1']:.1%} indicates {quality['quality_label'].lower()}.
+"""
+
+    return output
+
+
+def tool_quality_analysis(args: dict) -> str:
+    """
+    One-shot quality analysis: retrieves data, measures efficiency, and compares responses.
+    Returns complete report with efficiency metrics and quality assessment.
+    """
+    import utils
+
+    pdf_path     = args["pdf_path"]
+    query        = args["query"]
+    full_response = args["full_response"]
+    optimized_response = args["optimized_response"]
+    top_k        = int(args.get("top_k", 8))
+
+    # Prepare comparison data (retrieves full text + optimized chunks)
+    entry = _ensure_indexed(pdf_path)
+    full_text = entry["full_text"]
+    chunks = entry["chunks"]
+    index = entry["index"]
+
+    # Calculate token counts and savings
+    full_tokens = utils.count_tokens(full_text)
+    
+    # Retrieve optimized chunks
+    retrieved = utils.search_chunks(query, index, chunks, api_key=None, top_k=top_k)
+    optimized_text = "\n\n---\n\n".join(retrieved)
+    opt_tokens = utils.count_tokens(optimized_text)
+    savings_pct = round(100 * (1 - opt_tokens / full_tokens), 1) if full_tokens > 0 else 0
+
+    # Compute quality metrics
+    quality = utils.compute_response_quality(full_response, optimized_response)
+
+    # Format complete report
+    output = f"""[Groot] Complete Quality Analysis Report
+{'═' * 60}
+
+EFFICIENCY METRICS:
+  Token Reduction: {savings_pct}%
+  Full Document: {full_tokens:,} tokens
+  Optimized Context: {opt_tokens:,} tokens
+  Chunks Retrieved: {len(retrieved)}
+
+QUALITY METRICS:
+  F1 Score (semantic match): {quality['f1']:.1%}
+  Precision (relevance): {quality['precision']:.1%}
+  Recall (coverage): {quality['recall']:.1%}
+  Quality Label: {quality['quality_label']}
+
+{'─' * 60}
+FULL DOCUMENT RESPONSE:
+{full_response}
+
+{'─' * 60}
+OPTIMIZED RESPONSE:
+{optimized_response}
+
+{'─' * 60}
+ANALYSIS SUMMARY:
+
+Efficiency: The optimized context is {savings_pct}% smaller than the full document.
+
+Quality: {quality['description']}
+         The optimized response captures {quality['recall']:.0%} of the key information
+         from the full response with {quality['precision']:.0%} relevance.
+
+Recommendation: {'✅ EXCELLENT — Quality is maintained with significant savings!' if quality['f1'] >= 0.85 else '✅ GOOD — Quality is well-preserved with significant savings.' if quality['f1'] >= 0.70 else '⚠️ FAIR — Notable quality loss but still useful.' if quality['f1'] >= 0.50 else '❌ POOR — Significant quality degradation.'}
+{'═' * 60}
+"""
+
+    return output
+
+
 # ── Request dispatcher ──────────────────────────────────────────────────────
 
 def handle(request: dict) -> None:
@@ -276,6 +539,12 @@ def handle(request: dict) -> None:
                 text = tool_index_document(args)
             elif tool_name == "list_indexed":
                 text = tool_list_indexed(args)
+            elif tool_name == "prepare_comparison_data":
+                text = tool_prepare_comparison_data(args)
+            elif tool_name == "compare_responses":
+                text = tool_compare_responses(args)
+            elif tool_name == "quality_analysis":
+                text = tool_quality_analysis(args)
             else:
                 err(rid, -32601, f"Unknown tool: {tool_name}")
                 return
