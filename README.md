@@ -1,266 +1,346 @@
-# 🌿 Groot - AI Document Context Optimizer
+# Groot - AI Document Context Optimizer
 
-A Streamlit application that reduces AI language model costs by retrieving only the document sections relevant to a query, instead of sending the entire document as context.
+Groot reduces the amount of document context sent to an LLM. It extracts text
+from PDFs, splits the text into overlapping chunks, embeds the chunks locally,
+retrieves the most relevant chunks for a query, and compares the result with a
+full-document response.
 
-## 📋 Table of Contents
+Groot is available in two forms:
 
-- [Overview](#overview)
-- [How It Works](#how-it-works)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Usage Guide](#usage-guide)
-- [Technology Stack](#technology-stack)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
-- [Performance](#performance)
-- [Environment Impact](#environment-impact)
+1. A Streamlit application for interactive upload, retrieval, cost, and quality
+   comparisons.
+2. A stdio Model Context Protocol (MCP) server for MCP clients such as VS Code
+   GitHub Copilot.
 
----
+## What Groot does
 
-## 🎯 Overview
+For each PDF and query, Groot can:
 
-When processing large documents with AI models, organizations typically pass the entire document as context — leading to high token consumption, inflated API costs, and slower inference. Groot solves this by using semantic vector search to extract only the chunks of a document that are relevant to a specific query, reducing context size by up to 96% while maintaining response quality.
+- Extract text page by page with `pypdf`.
+- Split text into overlapping word-based chunks.
+- Generate local `all-MiniLM-L6-v2` embeddings.
+- Store embeddings in a FAISS `IndexFlatL2` index.
+- Expand queries, search multiple query variants, and deduplicate candidates.
+- Re-rank candidates using literal keyword matches.
+- Return only the most relevant chunks instead of the complete document.
+- Count full and optimized context tokens with `tiktoken`.
+- Estimate input-token cost and savings.
+- Generate full-document and optimized-context Gemini responses.
+- Compare response quality using embedding-based precision, recall, and F1.
 
----
+The retrieval pipeline is local. Gemini is used only for response generation
+when the Streamlit comparison is run.
 
-## 🔍 How It Works
+## Architecture
 
-When you upload a PDF, Groot reads it page by page using **pypdf** and concatenates all the extracted text into a single string — the raw full document. This full text is what a naive LLM integration would send directly to the model, costing tens of thousands of tokens on every query.
+```text
+PDF upload or MCP PDF path
+            |
+            v
+       PDF extraction
+            |
+            v
+  Word chunking with overlap
+            |
+            v
+ Local SentenceTransformer embeddings
+            |
+            v
+        FAISS index
+            |
+            v
+ Query expansion and vector search
+            |
+            v
+ Keyword re-ranking and top-k selection
+            |
+            +----------------------+
+            |                      |
+            v                      v
+ Full document context       Retrieved context
+            |                      |
+            +----------+-----------+
+                       v
+              Gemini responses
+                       |
+                       v
+             Quality and cost metrics
+```
 
-Instead, Groot immediately splits that text into overlapping chunks using **LangChain's RecursiveCharacterTextSplitter**. Each chunk is roughly 500 words (≈2,500 characters) with a 100-word overlap between adjacent chunks. The overlap ensures that a sentence split across a chunk boundary still appears fully in at least one chunk, so no fact gets lost at the seam.
+### Main modules
 
-Every chunk is then passed through **all-MiniLM-L6-v2**, a local SentenceTransformer model that runs entirely on the server with no API calls. It converts each chunk into a 384-dimensional float32 vector — a point in mathematical space where semantically similar text lands close together. All these vectors are loaded into a **FAISS IndexFlatL2**, an in-memory index that can find the nearest neighbours to any query vector in under a millisecond regardless of document size. This entire indexing process runs in a background thread so the UI stays responsive.
+- `app.py` - Streamlit entry point, page routing, and global UI configuration.
+- `sections/optimizer.py` - Upload, query, background indexing, retrieval,
+  model calls, cost metrics, and response-quality display.
+- `components/settings.py` - Streamlit settings for backend, API cost,
+  chunking, and top-k retrieval.
+- `core/ingestion/` - PDF parsing, chunking, and token counting.
+- `core/vectorstore/` - Local embedding model, FAISS construction, and
+  persistent index storage.
+- `core/retrieval/` - Query expansion, keyword extraction, vector search, and
+  re-ranking.
+- `core/generation/` - Gemini REST API and Vertex AI generation gateways.
+- `core/evaluation/` - Semantic comparison of full and optimized responses.
+- `core/services/` - Background document-processing thread used by Streamlit.
+- `mcp_server.py` - JSON-RPC stdio MCP server.
+- `utils.py` - Backward-compatible facade that re-exports core APIs.
 
-When you type a query, Groot does not simply embed it and search once. It first runs **query expansion**: it strips instruction words like "summarize" or "explain" to expose the core topic, then uses a regex to extract any conditional clauses (phrases starting with *when*, *if*, *while*, *during*, etc.) as separate sub-queries — because the document likely uses that exact conditional phrasing in the answer. It also adds a keyword-only fallback. The result is 2–5 search strings from a single user query.
+## Retrieval pipeline
 
-Each sub-query is independently embedded and searched against the FAISS index, fetching a pool of `top_k × 5` candidates. All results are merged and deduplicated by chunk position. The candidates are then **re-ranked**: for every query keyword that appears literally in a chunk's text, its effective distance is reduced by 0.08. This means a chunk containing the exact domain terms from the query floats above a chunk that is only semantically similar — which is what catches specific operational facts that pure vector similarity misses. Finally, any candidate with a raw L2 distance above 2.0 is dropped, and the best `top_k` chunks are returned.
+### Ingestion and indexing
 
-Those chunks — typically 3–8% of the original document's tokens — are joined and sent to **Gemini** as the context window. The same query is also sent with the full raw document so you can compare responses side by side. Groot displays the token counts, costs, and savings for both paths so the quality-versus-cost tradeoff is immediately visible.
+`pypdf` extracts text from every PDF page. The text is split into chunks using
+the configured `chunk_size` and `chunk_overlap` values. The default settings
+are 500 words per chunk and 100 words of overlap.
 
----
+The chunks are embedded with the local
+`sentence-transformers/all-MiniLM-L6-v2` model and added to a FAISS
+`IndexFlatL2` index.
 
-## 🏗️ Architecture
+The Streamlit application performs this work in
+`DocumentProcessorThread` so the UI can show progress while indexing.
 
-![Groot Core Pipeline](groot-core-pipeline.svg)
+### Retrieval
 
-> The draw.io source (`groot-core-pipeline.drawio`) is also in the repo — open it at [diagrams.net](https://app.diagrams.net) or in the draw.io desktop app for an editable version.
+`search_chunks`:
 
----
+1. Expands the query into the original query plus relevant sub-queries.
+2. Searches FAISS for each query variant.
+3. Merges and deduplicates candidates by chunk index.
+4. Subtracts a keyword bonus from distances for literal query-keyword matches.
+5. Removes candidates above the similarity threshold when possible.
+6. Returns the best `top_k` chunks.
 
-## 🚀 Getting Started
+The default candidate pool is `top_k * 5`, the keyword bonus is `0.08`, and
+the similarity threshold is an L2 distance of `2.0`.
 
-### Prerequisites
+### Persistent cache
 
-- Python 3.11 or higher
-- Google Gemini API key (or Vertex AI credentials for Cloud Run)
+The MCP server uses a two-level cache:
+
+1. An in-process cache for repeated requests during one server session.
+2. A disk-backed cache under `.groot_cache/` for reuse across server
+   restarts.
+
+Persistent indexes are keyed by the PDF path, modification time, file size,
+chunk size, and chunk overlap. The cache contains FAISS index files and
+metadata including extracted text, chunks, and token counts.
+
+## Streamlit application
 
 ### Installation
 
-```bash
+Groot requires Python 3.11 or later.
+
+```powershell
 git clone <repository-url>
 cd groot
 python -m venv .venv
-
-# Windows
 .venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-
 pip install -r requirements.txt
 ```
 
-### Running Locally
+### Run locally
 
-```bash
+```powershell
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`
+The application opens at `http://localhost:8501`.
 
----
+### Streamlit workflow
 
-## 📁 Project Structure
+1. Upload a text-based PDF.
+2. Enter a question or prompt.
+3. Select **Optimize and Compare**.
+4. Groot indexes the PDF and retrieves the relevant chunks.
+5. The application displays full and optimized token counts and estimated
+   input costs.
+6. Gemini generates a response from the full document and another from the
+   retrieved context.
+7. Groot displays semantic precision, recall, F1, and a quality label.
 
+The application supports two generation backends:
+
+- **API Key (Local)** - Gemini REST API using a Google AI Studio API key.
+- **Vertex AI (Cloud Run)** - `google-genai` using Vertex AI credentials.
+
+The API-key backend requires the key to be entered through the Settings dialog.
+Do not commit API keys to the repository.
+
+## MCP server
+
+The MCP server uses stdio JSON-RPC. The MCP client starts the Python process
+and communicates through stdin/stdout. stdout is reserved for protocol
+messages; diagnostics are written to a log file or stderr.
+
+The VS Code configuration is in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "groot": {
+      "type": "stdio",
+      "command": "C:\\path\\to\\groot\\.venv\\Scripts\\python.exe",
+      "args": ["mcp_server.py"],
+      "cwd": "C:\\path\\to\\groot"
+    }
+  }
+}
 ```
+
+### MCP tools
+
+`mcp_server.py` exposes these tools:
+
+- `retrieve_context` - Retrieve relevant PDF chunks for a query.
+- `index_document` - Pre-index a PDF and report chunk and token counts.
+- `list_indexed` - List documents indexed in the current server session.
+- `prepare_comparison_data` - Return the full document and optimized context
+  for a matched response comparison.
+- `compare_responses` - Compare a full-document response with an optimized
+  response.
+- `quality_analysis` - Run the complete token-efficiency and response-quality
+  analysis.
+
+Example MCP tool input:
+
+```json
+{
+  "pdf_path": "C:\\path\\to\\groot\\resources\\spring-boot-reference.pdf",
+  "query": "How does Spring Boot auto-configuration work?",
+  "top_k": 8
+}
+```
+
+### MCP logging
+
+By default, the server writes lifecycle, request, tool, duration, and error
+messages to:
+
+```text
+.groot_cache/mcp_server.log
+```
+
+To send logs to stderr instead, set this environment variable in the MCP
+configuration:
+
+```json
+"GROOT_MCP_LOG": "stderr"
+```
+
+Do not write application logs to stdout because that would corrupt MCP
+JSON-RPC communication.
+
+## Configuration
+
+The Streamlit Settings dialog stores configuration in `st.session_state`.
+
+| Setting | Default | Purpose |
+| --- | ---: | --- |
+| Gemini backend | Vertex AI (Cloud Run) | Select REST API or Vertex AI generation |
+| Cost per 1M input tokens | `$3.50` | Used for estimated cost and savings |
+| Chunk size | `500` words | Size of each indexed chunk |
+| Chunk overlap | `100` words | Shared text between adjacent chunks |
+| Top K | `8` | Number of retrieved chunks |
+
+The cost is an estimate based on the configured input-token price. It is not a
+billing report and does not include output-token or provider-specific charges.
+
+## Project structure
+
+```text
 groot/
-├── .groot_cache/                   # Persistent disk cache (FAISS binaries & metadata)
-├── app.py                          # Main Streamlit application & page router
-├── utils.py                        # Facade module re-exporting core modules
-├── mcp_server.py                   # Model Context Protocol (MCP) tool server
-│
-├── core/                           # Enterprise RAG Core Package
-│   ├── ingestion/                  # PDF parsing & text chunking
-│   ├── vectorstore/                # Embeddings, FAISS index & persistent storage
-│   ├── retrieval/                  # Query expansion & keyword re-ranking search engine
-│   ├── generation/                 # Gemini REST & Vertex AI LLM gateways
-│   ├── evaluation/                 # Response quality & semantic alignment metrics
-│   └── services/                   # Background execution worker services
-│
-├── components/                     # Streamlit UI components
-│   ├── header.py                   # Navigation header
-│   └── settings.py                 # Settings modal and config state
-│
-├── sections/                       # Landing page & optimizer sections
-│   ├── optimizer.py                # Main optimizer tool (page 2)
+├── app.py
+├── mcp_server.py
+├── utils.py
+├── requirements.txt
+├── Dockerfile
+├── components/
+│   ├── header.py
+│   └── settings.py
+├── sections/
+│   ├── optimizer.py
 │   └── ...
-│
-├── resources/                      # Sample PDFs and logo image assets
-│   ├── groot-logo.png
-│   └── ...
-│
-├── tests/                          # Automated test suites
-│   ├── test_core.py                # Core package unit tests
-│   ├── test_persistence.py         # Persistent disk indexing cache unit test
-│   ├── test_quality.py             # Response quality evaluation test
-│   └── test_tools.py               # MCP server tool registration test
-│
-└── .github/workflows/
-    ├── deploy.yml                  # Build and deploy to Cloud Run
-    └── uninstall.yml               # Tear down Cloud Run service
+├── core/
+│   ├── config.py
+│   ├── ingestion/
+│   ├── vectorstore/
+│   ├── retrieval/
+│   ├── generation/
+│   ├── evaluation/
+│   └── services/
+├── resources/
+│   └── sample PDFs
+├── tests/
+├── docs/
+│   ├── groot-core-pipeline.svg
+│   └── groot-core-pipeline.drawio
+├── .github/workflows/
+│   ├── deploy.yml
+│   └── uninstall.yml
+└── .groot_cache/
+    ├── indexes/
+    ├── metadata.json
+    └── mcp_server.log
 ```
 
----
+`.groot_cache/` is generated runtime data. It should not be treated as source
+code and should be excluded from version control when appropriate.
 
-## 💻 Usage Guide
+## Testing
 
-**Step 1 — Upload a PDF** via the optimizer page. A progress bar tracks extraction → chunking → embedding → indexing.
+The repository includes tests for the core pipeline, persistence, quality
+scoring, and MCP tool registration.
 
-**Step 2 — Enter a query**, for example:
-- "Summarize the main risk factors"
-- "fup copy command when source file is open"
+```powershell
+pytest
+```
 
-**Step 3 — Click "Optimize and Compare"**. Groot retrieves the relevant chunks and generates two responses in parallel — one using the full document, one using only the retrieved context.
+Individual tests can be run with:
 
-**Step 4 — Review results**. Section 2 shows token counts and cost savings. Section 3 shows the side-by-side LLM responses.
+```powershell
+pytest tests/test_core.py
+pytest tests/test_persistence.py
+pytest tests/test_quality.py
+```
 
-**Step 5 — Tune settings** via ⚙️ Settings if needed (see [Configuration](#configuration)).
+`tests/test_tools.py` is a lightweight script that imports and prints the
+registered MCP tools.
 
----
+## Deployment
 
-## 🛠️ Technology Stack
+The `Dockerfile` runs the Streamlit application on port `8080`:
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | Streamlit | Web UI framework |
-| **Text Splitting** | LangChain `RecursiveCharacterTextSplitter` | Semantic-aware chunking |
-| **Embeddings** | `all-MiniLM-L6-v2` (Sentence-Transformers) | 384-dim local embeddings, <2GB RAM |
-| **Vector DB** | FAISS `IndexFlatL2` | Sub-millisecond L2 similarity search |
-| **Retrieval** | Multi-query expansion + keyword re-ranking | High-recall factual retrieval |
-| **LLM (local)** | Google Gemini REST API | Response generation with 4× retry |
-| **LLM (cloud)** | `gemini-2.5-flash` via Vertex AI SDK | Cloud Run production backend |
-| **PDF Processing** | pypdf | Page-by-page text extraction |
-| **Tokenization** | tiktoken `cl100k_base` | Token counting |
-| **Numerics** | NumPy | Embeddings and distance math |
-| **Concurrency** | `threading.Thread` | Non-blocking document processing |
-
----
-
-## ⚙️ Configuration
-
-All settings are stored in `st.session_state` and accessible via the ⚙️ Settings button in the app.
-
-### Tuning Parameters
-
-| Parameter | Default | Guidance |
-|-----------|---------|----------|
-| **Chunk Size** | 500 words | Larger = more context per chunk, fewer chunks. 300–700 works well. |
-| **Chunk Overlap** | 100 words | Prevents facts from being split at boundaries. 50–150 recommended. |
-| **Top-K** | 8 | More chunks = better recall but higher token count. 5–12 is the useful range. |
-| **Cost/1M tokens** | $3.50 | Set to your actual API tier pricing for accurate savings display. |
-
-### Retrieval Pipeline Constants (`core/retrieval/retriever.py`)
-
-| Constant | Value | Purpose |
-|----------|-------|---------|
-| `KEYWORD_BONUS` | 0.08 | L2 distance reduction per matched keyword during re-ranking |
-| `SIMILARITY_THRESHOLD` | 2.0 | Maximum L2 distance to keep a chunk (falls back to raw top_k if all filtered) |
-| Candidate pool | 5× top_k | FAISS fetch size per sub-query before re-ranking |
-| Embedding model | `all-MiniLM-L6-v2` | <2GB RAM — safe on Cloud Run 4 GiB instances |
-
----
-
-## 🐳 Deployment
-
-### Docker
-
-```bash
+```powershell
 docker build -t groot:latest .
 docker run -p 8080:8080 groot:latest
-# with API key:
-docker run -p 8080:8080 -e GOOGLE_API_KEY=your_key_here groot:latest
 ```
 
-### Cloud Run (Vertex AI mode)
+The manual GitHub Actions workflow in `.github/workflows/deploy.yml` builds and
+pushes an image to Google Artifact Registry, then deploys it to Cloud Run.
+Cloud Run uses the Vertex AI generation path and requires the configured
+Google Cloud service-account and project secrets.
 
-The app uses Workload Identity when `backend` is set to `"Vertex AI (Cloud Run)"` — no API key needed in production:
+The MCP server is intended to be launched by an MCP client. It is not the
+entry point used by the Dockerized Streamlit deployment.
 
-```python
-client = genai.Client(vertexai=True, project="singla", location="europe-west3")
-```
+## Limitations and future work
 
-CI/CD is handled by `.github/workflows/deploy.yml` (build + deploy) and `uninstall.yml` (teardown), both triggered via `workflow_dispatch`.
+- PDF ingestion currently targets text-based PDFs; scanned documents require
+  OCR before ingestion.
+- Retrieval is currently single-document per index request.
+- Embeddings and FAISS search are local, but response generation requires a
+  configured Gemini backend.
+- The quality score measures semantic alignment between two responses; it is
+  not a human factuality evaluation.
+- Potential extensions include DOCX/HTML ingestion, multi-document
+  collections, stronger re-ranking, and a standalone HTTP API.
 
----
+## Acknowledgments
 
-## � Performance
-
-| Metric | Unoptimized | Optimized | Improvement |
-|--------|-------------|-----------|-------------|
-| **Tokens/Query** | 135,000 | 5,000 | ~96% ↓ |
-| **Cost/Query** | $0.473 | $0.018 | ~96% ↓ |
-| **Vector Search** | — | <1ms | Sub-millisecond |
-| **Response Quality** | Baseline | Maintained | ✓ |
-
-Processing time: <5s for most documents, <30s for 500+ page documents.
-
----
-
-## 🌱 Environment Impact
-
-Each 96% token reduction directly translates to proportional savings in GPU cycles, inference energy, and CO₂ at the data centre. At scale (1M queries/day on a 135k-token document), the compounded savings are substantial.
-
----
-
-## 🤝 Contributing
-
-Areas for improvement:
-
-- [ ] Support for DOCX, TXT, HTML formats
-- [ ] Multi-document search across collections
-- [ ] Cross-encoder re-ranker for higher precision
-- [ ] REST API endpoints
-- [ ] Caching layer for frequently searched documents
-
----
-
-## 🆘 Troubleshooting
-
-**"API Key not found"** → Click ⚙️ Settings and enter your Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey).
-
-**"Could not extract text from PDF"** → The PDF must be text-based, not a scanned image. Use an OCR tool first.
-
-**"FAISS installation error"** → `pip install faiss-cpu` works on all platforms including Apple Silicon.
-
-**Optimized response missing specific details** → Increase Top-K in Settings (try 10–15).
-
----
-
-## 🙏 Acknowledgments
-
-- [Streamlit](https://streamlit.io/) — Web framework
-- [FAISS](https://github.com/facebookresearch/faiss) — Vector search
-- [Sentence-Transformers](https://www.sbert.net/) — `all-MiniLM-L6-v2` embeddings
-- [LangChain](https://python.langchain.com/) — Text splitting
-- [Google AI](https://ai.google.dev/) — Gemini LLM
-
----
-
-## 📧 Contact
-
-- **Email:** harishsingla89@gmail.com
-- **Issues:** GitHub issue tracker
-
----
-
-**Made with 🌿 for a smarter, greener AI future.**
+- [Streamlit](https://streamlit.io/)
+- [FAISS](https://github.com/facebookresearch/faiss)
+- [Sentence Transformers](https://www.sbert.net/)
+- [LangChain text splitters](https://python.langchain.com/)
+- [Google Gemini](https://ai.google.dev/)
