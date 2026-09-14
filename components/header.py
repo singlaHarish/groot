@@ -16,7 +16,7 @@ def render_header():
 
     # Load logo as base64 for embedding in header link
     try:
-        with open("image/groot-logo.png", "rb") as f:
+        with open("resources/groot-logo.png", "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
         logo_img_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 36px; width: 36px; object-fit: contain;">'
     except Exception:

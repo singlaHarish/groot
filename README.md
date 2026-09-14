@@ -114,13 +114,9 @@ groot/
 │   ├── integration.py
 │   └── footer_cta.py
 │
-├── image/
+├── resources/                      # Sample PDFs and logo image assets
 │   ├── groot-logo.png
-│   └── groot-logo_old.png
-│
-├── resources/                      # Sample PDFs for testing
-│   ├── Indian Paneer recipies.pdf
-│   └── vanguards_principles_for_investing_success.pdf
+│   └── ...
 │
 └── .github/workflows/
     ├── deploy.yml                  # Build and deploy to Cloud Run

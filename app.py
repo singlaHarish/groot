@@ -10,7 +10,7 @@ from sections.footer_cta import render_footer_cta
 from sections.optimizer import render_optimizer
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="Groot", layout="wide", page_icon="image/groot-logo.png")
+st.set_page_config(page_title="Groot", layout="wide", page_icon="resources/groot-logo.png")
 
 # --- SESSION STATE INITIALIZATION ---
 if "page" not in st.session_state:

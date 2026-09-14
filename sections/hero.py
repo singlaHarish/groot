@@ -3,7 +3,7 @@ import base64
 
 def render_hero():
     try:
-        with open("image/groot-logo.png", "rb") as f:
+        with open("resources/groot-logo.png", "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
         logo_img_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 64px; width: 64px; object-fit: contain; vertical-align: middle; margin-right: 0.8rem;">'
     except Exception:
