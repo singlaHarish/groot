@@ -85,38 +85,33 @@ Opens at `http://localhost:8501`
 ```
 groot/
 ├── app.py                          # Main Streamlit application & page router
-├── utils.py                        # Core retrieval pipeline
-│                                   #  ├─ extract_text_from_pdf
-│                                   #  ├─ chunk_text (LangChain splitter)
-│                                   #  ├─ build_faiss_index
-│                                   #  ├─ search_chunks (multi-stage retrieval)
-│                                   #  ├─ _expand_query (conditional clause extraction)
-│                                   #  ├─ _extract_keywords (stop-word filtered)
-│                                   #  ├─ generate_gemini_response (REST + retry)
-│                                   #  ├─ generate_gemini_vertex (Vertex AI SDK)
-│                                   #  └─ DocumentProcessorThread (background worker)
-├── requirements.txt
-├── Dockerfile
-├── groot-core-pipeline.svg         # Pipeline diagram (renders on GitHub)
-├── groot-core-pipeline.drawio      # Editable draw.io source
+├── utils.py                        # Facade module re-exporting core modules
+├── mcp_server.py                   # Model Context Protocol (MCP) tool server
 │
-├── components/
+├── core/                           # Enterprise RAG Core Package
+│   ├── ingestion/                  # PDF parsing & text chunking
+│   ├── vectorstore/                # SentenceTransformer embeddings & FAISS index
+│   ├── retrieval/                  # Query expansion & keyword re-ranking search engine
+│   ├── generation/                 # Gemini REST & Vertex AI LLM gateways
+│   ├── evaluation/                 # Response quality & semantic alignment metrics
+│   └── services/                   # Background execution worker services
+│
+├── components/                     # Streamlit UI components
 │   ├── header.py                   # Navigation header
 │   └── settings.py                 # Settings modal and config state
 │
-├── sections/                       # Landing page sections
+├── sections/                       # Landing page & optimizer sections
 │   ├── optimizer.py                # Main optimizer tool (page 2)
-│   ├── hero.py
-│   ├── technology.py
-│   ├── cost_savings.py
-│   ├── connectors.py
-│   ├── environment.py
-│   ├── integration.py
-│   └── footer_cta.py
+│   └── ...
 │
 ├── resources/                      # Sample PDFs and logo image assets
 │   ├── groot-logo.png
 │   └── ...
+│
+├── tests/                          # Automated test suites
+│   ├── test_core.py                # Core package unit tests
+│   ├── test_quality.py             # Response quality evaluation test
+│   └── test_tools.py               # MCP server tool registration test
 │
 └── .github/workflows/
     ├── deploy.yml                  # Build and deploy to Cloud Run
@@ -172,7 +167,7 @@ All settings are stored in `st.session_state` and accessible via the ⚙️ Sett
 | **Top-K** | 8 | More chunks = better recall but higher token count. 5–12 is the useful range. |
 | **Cost/1M tokens** | $3.50 | Set to your actual API tier pricing for accurate savings display. |
 
-### Retrieval Pipeline Constants (`utils.py`)
+### Retrieval Pipeline Constants (`core/retrieval/retriever.py`)
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
