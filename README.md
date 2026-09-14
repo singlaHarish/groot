@@ -84,13 +84,14 @@ Opens at `http://localhost:8501`
 
 ```
 groot/
+├── .groot_cache/                   # Persistent disk cache (FAISS binaries & metadata)
 ├── app.py                          # Main Streamlit application & page router
 ├── utils.py                        # Facade module re-exporting core modules
 ├── mcp_server.py                   # Model Context Protocol (MCP) tool server
 │
 ├── core/                           # Enterprise RAG Core Package
 │   ├── ingestion/                  # PDF parsing & text chunking
-│   ├── vectorstore/                # SentenceTransformer embeddings & FAISS index
+│   ├── vectorstore/                # Embeddings, FAISS index & persistent storage
 │   ├── retrieval/                  # Query expansion & keyword re-ranking search engine
 │   ├── generation/                 # Gemini REST & Vertex AI LLM gateways
 │   ├── evaluation/                 # Response quality & semantic alignment metrics
@@ -110,6 +111,7 @@ groot/
 │
 ├── tests/                          # Automated test suites
 │   ├── test_core.py                # Core package unit tests
+│   ├── test_persistence.py         # Persistent disk indexing cache unit test
 │   ├── test_quality.py             # Response quality evaluation test
 │   └── test_tools.py               # MCP server tool registration test
 │

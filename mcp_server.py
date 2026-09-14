@@ -20,8 +20,37 @@ If you want to test it manually:
 
 import sys
 import json
+import logging
 import os
 import io
+import time
+
+# MCP uses stdout for JSON-RPC messages, so diagnostics must use a separate
+# stream. The log location can be overridden for VS Code or local debugging.
+_DEFAULT_LOG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    ".groot_cache",
+    "mcp_server.log",
+)
+_logger = logging.getLogger("groot.mcp")
+
+
+def configure_logging() -> None:
+    log_target = os.environ.get("GROOT_MCP_LOG", _DEFAULT_LOG_PATH)
+    if log_target.lower() == "stderr":
+        handler = logging.StreamHandler(sys.stderr)
+    else:
+        os.makedirs(os.path.dirname(os.path.abspath(log_target)), exist_ok=True)
+        handler = logging.FileHandler(log_target, encoding="utf-8")
+
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S%z",
+    ))
+    _logger.setLevel(logging.INFO)
+    _logger.addHandler(handler)
+    _logger.propagate = False
+
 
 # ── In-process document cache ──────────────────────────────────────────────
 # Stores already-indexed documents so repeated queries on the same file
@@ -232,15 +261,23 @@ def _ensure_indexed(pdf_path: str,
     """
     abs_path = os.path.abspath(pdf_path)
 
-    if abs_path in _cache:
-        return _cache[abs_path]
-
     if not os.path.isfile(abs_path):
         raise FileNotFoundError(f"File not found: {abs_path}")
 
     # Import here so startup is fast even if heavy deps are slow to load
     import utils  # Groot's own pipeline
 
+    # 1. Check in-process memory cache
+    if abs_path in _cache and _cache[abs_path].get("chunk_size") == chunk_size and _cache[abs_path].get("chunk_overlap") == chunk_overlap:
+        return _cache[abs_path]
+
+    # 2. Check disk-backed persistent cache
+    persistent_entry = utils.load_persistent_index(abs_path, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    if persistent_entry is not None:
+        _cache[abs_path] = persistent_entry
+        return persistent_entry
+
+    # 3. If not cached, perform full extraction, chunking, and embedding
     with open(abs_path, "rb") as f:
         full_text = utils.extract_text_from_pdf(f)
 
@@ -253,6 +290,18 @@ def _ensure_indexed(pdf_path: str,
                               chunk_overlap=chunk_overlap)
 
     index, _ = utils.build_faiss_index(chunks, api_key=None, show_progress=False)
+    token_count = utils.count_tokens(full_text)
+
+    # Save to disk persistent cache
+    utils.save_persistent_index(
+        pdf_path=abs_path,
+        full_text=full_text,
+        chunks=chunks,
+        index=index,
+        token_count=token_count,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap
+    )
 
     entry = {
         "full_text":    full_text,
@@ -260,7 +309,7 @@ def _ensure_indexed(pdf_path: str,
         "index":        index,
         "chunk_size":   chunk_size,
         "chunk_overlap": chunk_overlap,
-        "token_count":  utils.count_tokens(full_text),
+        "token_count":  token_count,
         "path":         abs_path,
     }
     _cache[abs_path] = entry
@@ -507,6 +556,7 @@ Recommendation: {'✅ EXCELLENT — Quality is maintained with significant savin
 def handle(request: dict) -> None:
     method = request.get("method", "")
     rid    = request.get("id")          # None for notifications
+    _logger.info("request id=%r method=%s", rid, method)
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
     if method == "initialize":
@@ -515,22 +565,30 @@ def handle(request: dict) -> None:
             "serverInfo": {"name": "groot", "version": "1.0.0"},
             "capabilities": {"tools": {}}
         })
+        _logger.info("initialized id=%r", rid)
 
     elif method == "notifications/initialized":
-        pass  # notification — no response
+        _logger.info("client initialization notification received")
 
     elif method == "ping":
         ok(rid, {})
+        _logger.info("ping completed id=%r", rid)
 
     # ── Tool discovery ─────────────────────────────────────────────────────
     elif method == "tools/list":
         ok(rid, {"tools": TOOLS})
+        _logger.info("listed %d tools id=%r", len(TOOLS), rid)
 
     # ── Tool execution ─────────────────────────────────────────────────────
     elif method == "tools/call":
         params    = request.get("params", {})
         tool_name = params.get("name", "")
         args      = params.get("arguments", {})
+        started = time.perf_counter()
+        _logger.info(
+            "tool started id=%r tool=%s argument_keys=%s",
+            rid, tool_name, sorted(args) if isinstance(args, dict) else [],
+        )
 
         try:
             if tool_name == "retrieve_context":
@@ -553,13 +611,19 @@ def handle(request: dict) -> None:
                 "content": [{"type": "text", "text": text}],
                 "isError": False
             })
+            _logger.info(
+                "tool completed id=%r tool=%s duration_ms=%.1f",
+                rid, tool_name, (time.perf_counter() - started) * 1000,
+            )
 
         except (FileNotFoundError, RuntimeError) as e:
+            _logger.exception("tool failed id=%r tool=%s", rid, tool_name)
             ok(rid, {
                 "content": [{"type": "text", "text": f"Error: {e}"}],
                 "isError": True
             })
         except Exception as e:
+            _logger.exception("tool failed unexpectedly id=%r tool=%s", rid, tool_name)
             ok(rid, {
                 "content": [{"type": "text", "text": f"Unexpected error: {e}"}],
                 "isError": True
@@ -567,12 +631,16 @@ def handle(request: dict) -> None:
 
     # ── Unknown method ─────────────────────────────────────────────────────
     elif rid is not None:
+        _logger.warning("unknown method id=%r method=%s", rid, method)
         err(rid, -32601, f"Method not found: {method}")
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────
 
 def main() -> None:
+    configure_logging()
+    _logger.info("Groot MCP server started pid=%d", os.getpid())
+
     # Ensure the groot directory is on sys.path so `import utils` works
     # regardless of where the MCP client launches the process from.
     groot_dir = os.path.dirname(os.path.abspath(__file__))
@@ -587,8 +655,10 @@ def main() -> None:
         try:
             request = json.loads(raw)
             handle(request)
-        except json.JSONDecodeError:
-            pass  # malformed input — MCP spec says ignore
+        except json.JSONDecodeError as e:
+            _logger.warning("ignored malformed JSON-RPC input: %s", e)
+
+    _logger.info("Groot MCP server stdin closed; shutting down")
 
 
 if __name__ == "__main__":
